@@ -10,6 +10,74 @@ import (
 
 var pow10 = [20]uint64{1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000, 10000000000, 100000000000, 1000000000000, 10000000000000, 100000000000000, 1000000000000000, 10000000000000000, 100000000000000000, 1000000000000000000, 10000000000000000000}
 
+type Number interface {
+	~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~int | ~int8 | ~int16 | ~int32 | ~int64 | ~float32 | ~float64
+}
+
+func New[N Number](value N) *Decimal {
+	var d Decimal
+	switch v := any(value).(type) {
+	case uint:
+		d.Integer = uint64(v)
+	case uint8:
+		d.Integer = uint64(v)
+	case uint16:
+		d.Integer = uint64(v)
+	case uint32:
+		d.Integer = uint64(v)
+	case uint64:
+		d.Integer = v
+	case int:
+		if v < 0 {
+			d.Negative = true
+			v = -v
+		}
+		d.Integer = uint64(v)
+	case int8:
+		if v < 0 {
+			d.Negative = true
+			v = -v
+		}
+		d.Integer = uint64(v)
+	case int16:
+		if v < 0 {
+			d.Negative = true
+			v = -v
+		}
+		d.Integer = uint64(v)
+	case int32:
+		if v < 0 {
+			d.Negative = true
+			v = -v
+		}
+		d.Integer = uint64(v)
+	case int64:
+		if v < 0 {
+			d.Negative = true
+			v = -v
+		}
+		d.Integer = uint64(v)
+	case float32:
+		d.FromFloat64(float64(v))
+	case float64:
+		d.FromFloat64(v)
+	}
+	return &d
+}
+
+func NewFromString(s string) (*Decimal, error) {
+	var d Decimal
+	err := d.FromString(s)
+	if err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
+func Zero() *Decimal {
+	return &Decimal{}
+}
+
 type Decimal struct {
 	Negative bool
 	Integer  uint64
@@ -187,4 +255,23 @@ func (d *Decimal) DivideUint64(u uint64) *Decimal {
 	d.Integer /= u
 	d.Fraction /= u
 	return d
+}
+
+func (d *Decimal) ToDigits(digits uint8) *Decimal {
+	for ; d.Digits < digits; d.Digits++ {
+		d.Fraction *= 10
+	}
+	for ; d.Digits > digits; d.Digits-- {
+		d.Fraction /= 10
+	}
+	return d
+}
+
+func (d *Decimal) Clone() *Decimal {
+	return &Decimal{
+		Negative: d.Negative,
+		Integer:  d.Integer,
+		Fraction: d.Fraction,
+		Digits:   d.Digits,
+	}
 }

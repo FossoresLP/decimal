@@ -414,3 +414,89 @@ func TestDecimal_DivideUint64(t *testing.T) {
 		})
 	}
 }
+
+func TestNew(t *testing.T) {
+	d := decimal.New(123.123).ToDigits(3)
+	if d.Integer != 123 || d.Fraction != 123 || d.Digits != 3 || d.Negative {
+		t.Errorf("New() = %v, want %v", d, decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3})
+	}
+	d = decimal.New(-123.123).ToDigits(3)
+	if d.Integer != 123 || d.Fraction != 123 || d.Digits != 3 || !d.Negative {
+		t.Errorf("New() = %v, want %v", d, decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3, Negative: true})
+	}
+	d = decimal.New(123)
+	if d.Integer != 123 || d.Fraction != 0 || d.Digits != 0 || d.Negative {
+		t.Errorf("New() = %v, want %v", d, decimal.Decimal{Integer: 123})
+	}
+	d = decimal.New(-123)
+	if d.Integer != 123 || d.Fraction != 0 || d.Digits != 0 || !d.Negative {
+		t.Errorf("New() = %v, want %v", d, decimal.Decimal{Integer: 123, Negative: true})
+	}
+}
+
+func TestDecimal_NewFromString(t *testing.T) {
+	tests := []struct {
+		name    string
+		s       string
+		want    *decimal.Decimal
+		wantErr bool
+	}{
+		{"zero", "0.0", &decimal.Decimal{Digits: 1}, false},
+		{"integer", "123.0", &decimal.Decimal{Integer: 123, Digits: 1}, false},
+		{"fraction", "0.123", &decimal.Decimal{Fraction: 123, Digits: 3}, false},
+		{"digits", "123.123", &decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, false},
+		{"negative", "-123.123", &decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3, Negative: true}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := decimal.NewFromString(tt.s)
+			if err != nil && !tt.wantErr {
+				t.Errorf("Decimal.NewString() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Decimal.NewString() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDecimal_Clone(t *testing.T) {
+	d := decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3, Negative: true}
+	c := d.Clone()
+	if !reflect.DeepEqual(c, &d) {
+		t.Errorf("Decimal.Clone() = %v, want %v", c, d)
+	}
+	if c == &d {
+		t.Errorf("Decimal.Clone() did not return a copy")
+	}
+}
+
+func TestDecimal_ToDigits(t *testing.T) {
+	tests := []struct {
+		name   string
+		d      decimal.Decimal
+		digits uint8
+		want   *decimal.Decimal
+	}{
+		{"zero", decimal.Decimal{}, 3, &decimal.Decimal{Digits: 3}},
+		{"integer", decimal.Decimal{Integer: 123}, 3, &decimal.Decimal{Integer: 123, Digits: 3}},
+		{"fraction", decimal.Decimal{Fraction: 123, Digits: 3}, 6, &decimal.Decimal{Fraction: 123000, Digits: 6}},
+		{"digits", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, 6, &decimal.Decimal{Integer: 123, Fraction: 123000, Digits: 6}},
+		{"negative", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3, Negative: true}, 6, &decimal.Decimal{Integer: 123, Fraction: 123000, Digits: 6, Negative: true}},
+		{"less_low", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, 2, &decimal.Decimal{Integer: 123, Fraction: 12, Digits: 2}},
+		{"less_high", decimal.Decimal{Integer: 123, Fraction: 456, Digits: 3}, 2, &decimal.Decimal{Integer: 123, Fraction: 45, Digits: 2}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.d.ToDigits(tt.digits); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Decimal.ToDigits() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDecimal_Zero(t *testing.T) {
+	if !reflect.DeepEqual(decimal.Zero(), &decimal.Decimal{}) {
+		t.Errorf("Decimal.Zero() = %v, want %v", decimal.Zero(), &decimal.Decimal{})
+	}
+}
