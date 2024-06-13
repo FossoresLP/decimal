@@ -88,24 +88,29 @@ func BenchmarkDecimal_StringPadLong(b *testing.B) {
 func TestDecimal_FromString(t *testing.T) {
 	tests := []struct {
 		name    string
-		d       decimal.Decimal
+		d       *decimal.Decimal
 		s       string
 		wantErr bool
 	}{
-		{"zero", decimal.Decimal{}, "0.0", false},
-		{"integer", decimal.Decimal{}, "123.0", false},
-		{"fraction", decimal.Decimal{}, "0.123", false},
-		{"digits", decimal.Decimal{}, "123.123", false},
-		{"invalid", decimal.Decimal{}, "123.123.123", true},
-		{"leading_dot", decimal.Decimal{}, ".123", false},
-		{"trailing_dot", decimal.Decimal{}, "123.", false},
-		{"empty", decimal.Decimal{}, "", false},
-		{"negative", decimal.Decimal{}, "-123.123", false},
+		{"zero", &decimal.Decimal{Digits: 1}, "0.0", false},
+		{"integer", &decimal.Decimal{Integer: 123, Digits: 1}, "123.0", false},
+		{"fraction", &decimal.Decimal{Fraction: 123, Digits: 3}, "0.123", false},
+		{"digits", &decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, "123.123", false},
+		{"invalid", nil, "123.123.123", true},
+		{"leading_dot", &decimal.Decimal{Fraction: 123, Digits: 3}, ".123", false},
+		{"trailing_dot", &decimal.Decimal{Integer: 123}, "123.", false},
+		{"empty", &decimal.Decimal{}, "", false},
+		{"negative", &decimal.Decimal{Negative: true, Integer: 123, Fraction: 123, Digits: 3}, "-123.123", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.d.FromString(tt.s); (err != nil) != tt.wantErr {
+			d := decimal.Decimal{}
+			err := d.FromString(tt.s)
+			if (err != nil) != tt.wantErr {
 				t.Errorf("Decimal.FromString() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.d != nil && !reflect.DeepEqual(d, *tt.d) {
+				t.Errorf("Decimal.FromString() = %v, want %v", d, *tt.d)
 			}
 		})
 	}
