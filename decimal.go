@@ -74,6 +74,16 @@ func NewFromString(s string) (*Decimal, error) {
 	return &d, nil
 }
 
+// NewFromStringFuzzy extracts and parses the first number from a string, ignoring any leading or trailing non-numeric characters.
+func NewFromStringFuzzy(s string) (*Decimal, error) {
+	var d Decimal
+	err := d.FromStringFuzzy(s)
+	if err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
 func Zero() *Decimal {
 	return &Decimal{}
 }
@@ -155,6 +165,51 @@ fracloop:
 			d.Fraction = d.Fraction*10 + uint64(s[pos]-'0')
 		} else {
 			return fmt.Errorf("invalid character in fraction: %s", s[pos:])
+		}
+	}
+	return nil
+}
+
+// FromStringFuzzy extracts and parses the first number from a string, ignoring any leading or trailing non-numeric characters.
+func (d *Decimal) FromStringFuzzy(s string) error {
+	d.Negative = false
+	d.Integer = 0
+	d.Fraction = 0
+	d.Digits = 0
+	l := len(s)
+	if l == 0 {
+		return nil
+	}
+	pos := 0
+	for ; pos < l; pos++ {
+		if s[pos] == '-' || s[pos] >= '0' && s[pos] <= '9' || s[pos] == '.' {
+			goto intloop
+		}
+	}
+	return fmt.Errorf("no digits found in string: %s", s)
+intloop:
+	if s[0] == '-' {
+		d.Negative = true
+		pos = 1
+	}
+	for ; pos < l; pos++ {
+		if s[pos] >= '0' && s[pos] <= '9' {
+			d.Integer = d.Integer*10 + uint64(s[pos]-'0')
+		} else if s[pos] == '.' {
+			pos++
+			goto fracloop
+		} else {
+			return nil
+		}
+	}
+	return nil
+fracloop:
+	for ; pos < l; pos++ {
+		if s[pos] >= '0' && s[pos] <= '9' {
+			d.Digits++
+			d.Fraction = d.Fraction*10 + uint64(s[pos]-'0')
+		} else {
+			return nil
 		}
 	}
 	return nil
