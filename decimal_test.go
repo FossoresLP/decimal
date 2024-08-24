@@ -328,6 +328,28 @@ func BenchmarkDecimal_FromFloat64Fixed(b *testing.B) {
 	}
 }
 
+func FuzzDecimal_FromFloat64(f *testing.F) {
+	testcases := []float64{123.456, 0.123, 0.000000000000000001, 1234567890123456789.12345678901234567890, 3.3333333333}
+	for _, tc := range testcases {
+		f.Add(tc) // Use f.Add to provide a seed corpus
+	}
+	f.Fuzz(func(t *testing.T, f float64) {
+		if f > math.MaxUint64 {
+			return
+		}
+		da := decimal.Decimal{}
+		da.FromFloat64(f)
+		if math.Abs(da.Float64()-f) > 1e-15 {
+			t.Errorf("Decimal.FromFloat64() = %.18f, want %.18f", da.Float64(), f)
+		}
+		df := decimal.Decimal{}
+		df.FromFloat64Fixed(f, 18)
+		if math.Abs(df.Float64()-f) > 1e-15 {
+			t.Errorf("Decimal.FromFloat64Fixed() = %.18f, want %.18f", df.Float64(), f)
+		}
+	})
+}
+
 func TestDecimal_Scan(t *testing.T) {
 	tests := []struct {
 		name    string
