@@ -297,6 +297,10 @@ func (d *Decimal) UnmarshalCBOR(data []byte) error {
 	return nil
 }
 
+func (d *Decimal) Equal(d2 *Decimal) bool {
+	return d.Negative == d2.Negative && d.Integer == d2.Integer && d.Fraction == d2.Fraction && d.Digits == d2.Digits
+}
+
 func (d *Decimal) MultiplyUint64(u uint64) *Decimal {
 	d.Integer *= u
 	d.Fraction *= u
