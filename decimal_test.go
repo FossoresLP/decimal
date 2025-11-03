@@ -545,6 +545,32 @@ func BenchmarkDecimal_UnmarshalJSON(b *testing.B) {
 	}
 }
 
+func TestDecimal_Equal(t *testing.T) {
+	tests := []struct {
+		name string
+		d1   decimal.Decimal
+		d2   decimal.Decimal
+		want bool
+	}{
+		{"zero", decimal.Decimal{}, decimal.Decimal{}, true},
+		{"integer", decimal.Decimal{Integer: 123}, decimal.Decimal{Integer: 123}, true},
+		{"fraction", decimal.Decimal{Fraction: 123, Digits: 3}, decimal.Decimal{Fraction: 123, Digits: 3}, true},
+		{"digits", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, true},
+		{"negative", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3, Negative: true}, decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3, Negative: true}, true},
+		{"different", decimal.Decimal{Integer: 123}, decimal.Decimal{Integer: 456}, false},
+		{"different_fraction", decimal.Decimal{Fraction: 123, Digits: 3}, decimal.Decimal{Fraction: 456, Digits: 3}, false},
+		{"different_digits", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, decimal.Decimal{Integer: 123, Fraction: 123, Digits: 4}, false},
+		{"different_negative", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3, Negative: true}, decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.d1.Equal(&tt.d2); got != tt.want {
+				t.Errorf("Decimal.Equal() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestDecimal_MultiplyUint64(t *testing.T) {
 	tests := []struct {
 		name       string
