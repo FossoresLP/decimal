@@ -89,9 +89,9 @@ func Zero() *Decimal {
 
 type Decimal struct {
 	Negative bool
+	Digits   uint8 // Number of digits in Fraction, must be less or equal to 20, not all values with 20 digits can be represented due to limits of uint64
 	Integer  uint64
 	Fraction uint64
-	Digits   uint8 // Number of digits in Fraction, must be less or equal to 20, not all values with 20 digits can be represented due to limits of uint64
 }
 
 func (d Decimal) Float64() float64 {
