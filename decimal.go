@@ -320,6 +320,39 @@ func (d *Decimal) DivideUint64(u uint64) *Decimal {
 	return d
 }
 
+func (d *Decimal) Add(d2 *Decimal) *Decimal {
+	// Extend the number with less digits to match the other
+	if d.Digits < d2.Digits {
+		d.ToDigits(d2.Digits)
+	} else if d.Digits > d2.Digits {
+		d2.ToDigits(d.Digits)
+	}
+	if d.Negative == d2.Negative {
+		d.Integer += d2.Integer
+		d.Fraction += d2.Fraction // TODO: check for overflow
+		d.Integer += d.Fraction / pow10[d.Digits]
+		d.Fraction %= pow10[d.Digits]
+	} else {
+		if d.Integer > d2.Integer {
+			d.Integer -= d2.Integer
+			if d.Fraction < d2.Fraction {
+				d.Fraction += pow10[d.Digits]
+				d.Integer--
+			}
+			d.Fraction -= d2.Fraction
+		} else {
+			d.Integer = d2.Integer - d.Integer
+			if d.Fraction > d2.Fraction {
+				d.Fraction -= d2.Fraction
+			} else {
+				d.Fraction = d2.Fraction - d.Fraction
+				d.Negative = !d.Negative
+			}
+		}
+	}
+	return d
+}
+
 func (d *Decimal) ToDigits(digits uint8) *Decimal {
 	for ; d.Digits < digits; d.Digits++ {
 		d.Fraction *= 10

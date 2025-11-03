@@ -619,6 +619,33 @@ func TestDecimal_DivideUint64(t *testing.T) {
 	}
 }
 
+func TestDecimal_Add(t *testing.T) {
+	tests := []struct {
+		name     string
+		d1       decimal.Decimal
+		d2       decimal.Decimal
+		expected *decimal.Decimal
+	}{
+		{"zero", decimal.Decimal{}, decimal.Decimal{}, &decimal.Decimal{}},
+		{"integer", decimal.Decimal{Integer: 123}, decimal.Decimal{Integer: 456}, &decimal.Decimal{Integer: 579}},
+		{"fraction", decimal.Decimal{Fraction: 123, Digits: 3}, decimal.Decimal{Fraction: 456, Digits: 3}, &decimal.Decimal{Fraction: 579, Digits: 3}},
+		{"digits", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, decimal.Decimal{Integer: 456, Fraction: 456, Digits: 3}, &decimal.Decimal{Integer: 579, Fraction: 579, Digits: 3}},
+		{"negative_d1", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3, Negative: true}, decimal.Decimal{Integer: 456, Fraction: 456, Digits: 3}, &decimal.Decimal{Integer: 333, Fraction: 333, Digits: 3}},
+		{"negative_d2", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, decimal.Decimal{Integer: 456, Fraction: 456, Digits: 3, Negative: true}, &decimal.Decimal{Integer: 333, Fraction: 333, Digits: 3, Negative: true}},
+		{"negative_both", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3, Negative: true}, decimal.Decimal{Integer: 456, Fraction: 456, Digits: 3, Negative: true}, &decimal.Decimal{Integer: 579, Fraction: 579, Digits: 3, Negative: true}},
+		{"large", decimal.Decimal{Integer: 1234567890, Fraction: 123456789, Digits: 10}, decimal.Decimal{Integer: 9876543210, Fraction: 987654321, Digits: 10}, &decimal.Decimal{Integer: 11111111100, Fraction: 1111111110, Digits: 10}},
+		{"different_digits_d1_less", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, decimal.Decimal{Integer: 456, Fraction: 456, Digits: 4}, &decimal.Decimal{Integer: 579, Fraction: 1686, Digits: 4}},
+		{"different_digits_d2_less", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 4}, decimal.Decimal{Integer: 456, Fraction: 456, Digits: 3}, &decimal.Decimal{Integer: 579, Fraction: 4683, Digits: 4}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if !tt.d1.Add(&tt.d2).Equal(tt.expected) {
+				t.Errorf("Decimal.Add() = %v, want %v", tt.d1, tt.expected)
+			}
+		})
+	}
+}
+
 func TestNew(t *testing.T) {
 	d := decimal.New(123.123).ToDigits(3)
 	if d.Integer != 123 || d.Fraction != 123 || d.Digits != 3 || d.Negative {
