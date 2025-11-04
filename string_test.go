@@ -11,14 +11,14 @@ func TestDecimal_NewFromString(t *testing.T) {
 	tests := []struct {
 		name    string
 		s       string
-		want    *decimal.Decimal
+		want    decimal.Decimal
 		wantErr bool
 	}{
-		{"zero", "0.0", &decimal.Decimal{Digits: 1}, false},
-		{"integer", "123.0", &decimal.Decimal{Integer: 123, Digits: 1}, false},
-		{"fraction", "0.123", &decimal.Decimal{Fraction: 123, Digits: 3}, false},
-		{"digits", "123.123", &decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, false},
-		{"negative", "-123.123", &decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3, Negative: true}, false},
+		{"zero", "0.0", decimal.Decimal{Digits: 1}, false},
+		{"integer", "123.0", decimal.Decimal{Integer: 123, Digits: 1}, false},
+		{"fraction", "0.123", decimal.Decimal{Fraction: 123, Digits: 3}, false},
+		{"digits", "123.123", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, false},
+		{"negative", "-123.123", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3, Negative: true}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -26,7 +26,7 @@ func TestDecimal_NewFromString(t *testing.T) {
 			if err != nil && !tt.wantErr {
 				t.Errorf("Decimal.NewString() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if !reflect.DeepEqual(got, tt.want) {
+			if !tt.want.Equal(got) {
 				t.Errorf("Decimal.NewString() = %v, want %v", got, tt.want)
 			}
 		})
@@ -37,16 +37,16 @@ func TestDecimal_NewFromStringFuzzy(t *testing.T) {
 	tests := []struct {
 		name    string
 		s       string
-		want    *decimal.Decimal
+		want    decimal.Decimal
 		wantErr bool
 	}{
-		{"zero", "0.0", &decimal.Decimal{Digits: 1}, false},
-		{"integer", "123.0", &decimal.Decimal{Integer: 123, Digits: 1}, false},
-		{"fraction", "0.123", &decimal.Decimal{Fraction: 123, Digits: 3}, false},
-		{"digits", "123.123", &decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, false},
-		{"negative", "-123.123", &decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3, Negative: true}, false},
-		{"prefix", "prefix123.123", &decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, false},
-		{"suffix", "123.123suffix", &decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, false},
+		{"zero", "0.0", decimal.Decimal{Digits: 1}, false},
+		{"integer", "123.0", decimal.Decimal{Integer: 123, Digits: 1}, false},
+		{"fraction", "0.123", decimal.Decimal{Fraction: 123, Digits: 3}, false},
+		{"digits", "123.123", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, false},
+		{"negative", "-123.123", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3, Negative: true}, false},
+		{"prefix", "prefix123.123", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, false},
+		{"suffix", "123.123suffix", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -54,7 +54,7 @@ func TestDecimal_NewFromStringFuzzy(t *testing.T) {
 			if err != nil && !tt.wantErr {
 				t.Errorf("Decimal.NewString() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if !reflect.DeepEqual(got, tt.want) {
+			if !tt.want.Equal(got) {
 				t.Errorf("Decimal.NewString() = %v, want %v", got, tt.want)
 			}
 		})

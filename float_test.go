@@ -69,7 +69,7 @@ func TestDecimal_FromFloat64(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.d.FromFloat64(tt.f)
-			if !tt.d.Equal(&tt.want) {
+			if !tt.d.Equal(tt.want) {
 				t.Errorf("Decimal.FromFloat64() = %#v, want %#v", tt.d, tt.want)
 			}
 		})
@@ -113,7 +113,7 @@ func TestDecimal_FromFloat64Fixed(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.d.FromFloat64Fixed(tt.f, tt.prec)
-			if !tt.d.Equal(&tt.want) {
+			if !tt.d.Equal(tt.want) {
 				t.Errorf("Decimal.FromFloat64Fixed() = %#v, want %#v", tt.d, tt.want)
 			}
 		})

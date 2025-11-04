@@ -68,7 +68,7 @@ func TestDecimal_UnmarshalCBOR(t *testing.T) {
 				t.Errorf("Decimal.UnmarshalCBOR() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !result.Equal(&tt.want) {
+			if !result.Equal(tt.want) {
 				t.Errorf("Decimal.UnmarshalCBOR() = %#v, want %#v", result, tt.want)
 			}
 		})
@@ -140,7 +140,7 @@ func TestDecimal_MarshalUnmarshalCBOR_RoundTrip(t *testing.T) {
 			}
 
 			// Compare
-			if !result.Equal(&tt.d) {
+			if !result.Equal(tt.d) {
 				t.Errorf("Round trip failed: got %#v, want %#v", result, tt.d)
 			}
 

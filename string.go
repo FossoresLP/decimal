@@ -4,23 +4,23 @@ import (
 	"fmt"
 )
 
-func NewFromString(s string) (*Decimal, error) {
+func NewFromString(s string) (Decimal, error) {
 	var d Decimal
 	err := d.FromString(s)
 	if err != nil {
-		return nil, err
+		return Zero(), err
 	}
-	return &d, nil
+	return d, nil
 }
 
 // NewFromStringFuzzy extracts and parses the first number from a string, ignoring any leading or trailing non-numeric characters.
-func NewFromStringFuzzy(s string) (*Decimal, error) {
+func NewFromStringFuzzy(s string) (Decimal, error) {
 	var d Decimal
 	err := d.FromStringFuzzy(s)
 	if err != nil {
-		return nil, err
+		return Zero(), err
 	}
-	return &d, nil
+	return d, nil
 }
 
 func (d *Decimal) bytes() []byte {
