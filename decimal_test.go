@@ -226,6 +226,30 @@ func TestDecimal_ToDigits(t *testing.T) {
 	}
 }
 
+func TestDecimal_IsZero(t *testing.T) {
+	tests := []struct {
+		name string
+		d    decimal.Decimal
+		want bool
+	}{
+		{"zero_value", decimal.Decimal{}, true},
+		{"zero_with_digits", decimal.Decimal{Digits: 3}, true},
+		{"zero_negative", decimal.Decimal{Negative: true}, true},
+		{"integer_only", decimal.Decimal{Integer: 1}, false},
+		{"fraction_only", decimal.Decimal{Fraction: 1, Digits: 1}, false},
+		{"both", decimal.Decimal{Integer: 1, Fraction: 1, Digits: 1}, false},
+		{"negative_integer", decimal.Decimal{Integer: 1, Negative: true}, false},
+		{"negative_fraction", decimal.Decimal{Fraction: 5, Digits: 1, Negative: true}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.d.IsZero(); got != tt.want {
+				t.Errorf("Decimal.IsZero() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestDecimal_Zero(t *testing.T) {
 	zero := decimal.Decimal{}
 	if !zero.Equal(decimal.Zero()) {

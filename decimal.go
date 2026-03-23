@@ -117,6 +117,11 @@ func (d Decimal) Equal(d2 Decimal) bool {
 	return a.Negative == b.Negative && a.Integer == b.Integer && a.Fraction == b.Fraction && a.Digits == b.Digits
 }
 
+// IsZero checks if a decimal value is zero.
+func (d Decimal) IsZero() bool {
+	return d.Integer == 0 && d.Fraction == 0
+}
+
 // MultiplyUint64 multiplies a decimal value by an unsigned integer.
 // Its overflow behavior matches that of integers in Go.
 func (d Decimal) MultiplyUint64(u uint64) Decimal {
