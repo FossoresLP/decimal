@@ -1,11 +1,22 @@
 package decimal
 
+import (
+	"math"
+	"math/bits"
+)
+
 var pow10 = [20]uint64{1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000, 10000000000, 100000000000, 1000000000000, 10000000000000, 100000000000000, 1000000000000000, 10000000000000000, 100000000000000000, 1000000000000000000, 10000000000000000000}
 
 type Number interface {
 	~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~int | ~int8 | ~int16 | ~int32 | ~int64 | ~float32 | ~float64
 }
 
+// New converts any of the builtin numeric types in Go to a decimal value.
+// It represents integer values exactly.
+// 32-bit floating point numbers are converted with 10 digits behind the decimal point.
+// 64-bit floating point numbers are converted with 18 digits behind the decimal point.
+// Floating point numbers exceeding the unsigned 64-bit integer range inherit Go's float-to-uint64 overflow logic.
+// Positive and negative infinity and NaN cannot be represented and are instead converted to zero.
 func New[N Number](value N) Decimal {
 	var d Decimal
 	switch v := any(value).(type) {
@@ -20,29 +31,33 @@ func New[N Number](value N) Decimal {
 	case uint64:
 		d.Integer = v
 	case int:
-		if v < 0 {
+		i := int64(v)
+		if i < 0 {
 			d.Negative = true
-			v = -v
+			i = -i
 		}
-		d.Integer = uint64(v)
+		d.Integer = uint64(i)
 	case int8:
-		if v < 0 {
+		i := int64(v)
+		if i < 0 {
 			d.Negative = true
-			v = -v
+			i = -i
 		}
-		d.Integer = uint64(v)
+		d.Integer = uint64(i)
 	case int16:
-		if v < 0 {
+		i := int64(v)
+		if i < 0 {
 			d.Negative = true
-			v = -v
+			i = -i
 		}
-		d.Integer = uint64(v)
+		d.Integer = uint64(i)
 	case int32:
-		if v < 0 {
+		i := int64(v)
+		if i < 0 {
 			d.Negative = true
-			v = -v
+			i = -i
 		}
-		d.Integer = uint64(v)
+		d.Integer = uint64(i)
 	case int64:
 		if v < 0 {
 			d.Negative = true
@@ -50,43 +65,90 @@ func New[N Number](value N) Decimal {
 		}
 		d.Integer = uint64(v)
 	case float32:
-		d.FromFloat64(float64(v))
+		if math.IsInf(float64(v), 0) || math.IsNaN(float64(v)) {
+			return Zero()
+		}
+		d.Negative = v < 0
+		if d.Negative {
+			v = -v
+		}
+		d.Integer = uint64(v)
+		d.Fraction = uint64((v - float32(d.Integer)) * float32(pow10[10]))
+		d.Digits = 10
+		d = d.Truncate()
 	case float64:
-		d.FromFloat64(v)
+		if math.IsInf(v, 0) || math.IsNaN(v) {
+			return Zero()
+		}
+		d.Negative = v < 0
+		if d.Negative {
+			v = -v
+		}
+		d.Integer = uint64(v)
+		d.Fraction = uint64((v - float64(d.Integer)) * float64(pow10[18]))
+		d.Digits = 18
+		d = d.Truncate()
 	}
 	return d
 }
 
+// Zero returns a zero value decimal
 func Zero() Decimal {
 	return Decimal{}
 }
 
+// Decimal represents high precision decimal numbers.
+// It can store numbers with up to 19 digits behind the decimal point.
+// The integer component is constrained to the range of a 64-bit unsigned integer in both positive and negative values.
+// When manually constructed or modified, `Digits` must represent the exact number of digits in `Fraction`.
+// Values with more than 19 fractional digits as well as negative zero are unsupported and will trigger undefined behavior.
 type Decimal struct {
 	Negative bool
-	Digits   uint8 // Number of digits in Fraction, must be less or equal to 20, not all values with 20 digits can be represented due to limits of uint64
+	Digits   uint8 // Number of digits in Fraction, must be less or equal to 19
 	Integer  uint64
 	Fraction uint64
 }
 
+// Equal checks if 2 decimal values are equal by value.
+// Values with different numbers of decimal digits are considered equal when their exact representations with the least possible number of digits behind the decimal point are equal.
 func (d Decimal) Equal(d2 Decimal) bool {
-	return d.Negative == d2.Negative && d.Integer == d2.Integer && d.Fraction == d2.Fraction && d.Digits == d2.Digits
+	a := d.Truncate()
+	b := d2.Truncate()
+	return a.Negative == b.Negative && a.Integer == b.Integer && a.Fraction == b.Fraction && a.Digits == b.Digits
 }
 
+// MultiplyUint64 multiplies a decimal value by an unsigned integer.
+// Its overflow behavior matches that of integers in Go.
 func (d Decimal) MultiplyUint64(u uint64) Decimal {
 	d.Integer *= u
-	d.Fraction *= u
+	hi, lo := bits.Mul64(d.Fraction, u)
+	quo, rem := bits.Div64(hi, lo, pow10[d.Digits])
+	d.Fraction = rem
+	d.Integer += quo
+	if d.Integer == 0 && d.Fraction == 0 {
+		d.Negative = false
+	}
+	return d
+}
+
+// DivideUint64 divides a decimal value by an unsigned integer.
+// Its overflow and divide-by-zero behavior match that of integers in Go.
+func (d Decimal) DivideUint64(u uint64) Decimal {
+	hi, lo := bits.Mul64(d.Integer%u, pow10[d.Digits])
+	lo, carry := bits.Add64(lo, d.Fraction, 0)
+	hi += carry
+	d.Integer /= u
+	d.Fraction, _ = bits.Div64(hi, lo, u)
 	d.Integer += d.Fraction / pow10[d.Digits]
 	d.Fraction %= pow10[d.Digits]
+	if d.Integer == 0 && d.Fraction == 0 {
+		d.Negative = false
+	}
 	return d
 }
 
-func (d Decimal) DivideUint64(u uint64) Decimal {
-	d.Fraction += d.Integer % u * pow10[d.Digits]
-	d.Integer /= u
-	d.Fraction /= u
-	return d
-}
-
+// Add adds two decimals together.
+// Its overflow behavior matches that of integers in Go.
 func (d Decimal) Add(d2 Decimal) Decimal {
 	// Extend the number with less digits to match the other
 	if d.Digits < d2.Digits {
@@ -96,11 +158,14 @@ func (d Decimal) Add(d2 Decimal) Decimal {
 	}
 	if d.Negative == d2.Negative {
 		d.Integer += d2.Integer
-		d.Fraction += d2.Fraction // TODO: check for overflow
-		d.Integer += d.Fraction / pow10[d.Digits]
-		d.Fraction %= pow10[d.Digits]
+		sum, carry := bits.Add64(d.Fraction, d2.Fraction, 0)
+		quo, rem := bits.Div64(carry, sum, pow10[d.Digits])
+		d.Integer += quo
+		d.Fraction = rem
 	} else {
-		if d.Integer > d2.Integer {
+		// Determine which operand has larger magnitude
+		if d.Integer > d2.Integer || (d.Integer == d2.Integer && d.Fraction >= d2.Fraction) {
+			// |d| >= |d2|, result keeps d's sign
 			d.Integer -= d2.Integer
 			if d.Fraction < d2.Fraction {
 				d.Fraction += pow10[d.Digits]
@@ -108,24 +173,72 @@ func (d Decimal) Add(d2 Decimal) Decimal {
 			}
 			d.Fraction -= d2.Fraction
 		} else {
+			// |d2| > |d|, result takes d2's sign
 			d.Integer = d2.Integer - d.Integer
-			if d.Fraction > d2.Fraction {
-				d.Fraction -= d2.Fraction
-			} else {
-				d.Fraction = d2.Fraction - d.Fraction
-				d.Negative = !d.Negative
+			if d2.Fraction < d.Fraction {
+				d2.Fraction += pow10[d.Digits]
+				d.Integer--
 			}
+			d.Fraction = d2.Fraction - d.Fraction
+			d.Negative = d2.Negative
+		}
+		// Canonicalize zero
+		if d.Integer == 0 && d.Fraction == 0 {
+			d.Negative = false
 		}
 	}
 	return d
 }
 
+// ToDigits converts a decimal value to the specified number of digits after the decimal point.
+// The number of digits is limited to 19.
+// Digits beyond the defined number are truncated, no rounding is performed.
 func (d Decimal) ToDigits(digits uint8) Decimal {
+	if digits > 19 {
+		digits = 19
+	}
 	for ; d.Digits < digits; d.Digits++ {
 		d.Fraction *= 10
 	}
 	for ; d.Digits > digits; d.Digits-- {
 		d.Fraction /= 10
 	}
+	if d.Integer == 0 && d.Fraction == 0 {
+		d.Negative = false
+	}
+	return d
+}
+
+// Truncate removes trailing zeros from the decimal value.
+func (d Decimal) Truncate() Decimal {
+	if d.Fraction == 0 {
+		if d.Integer == 0 {
+			d.Negative = false
+		}
+		d.Digits = 0
+		return d
+	}
+
+	if quot, rem := bits.Div64(0, d.Fraction, 10000000000000000); rem == 0 { // Check for 16 zeros
+		d.Fraction = quot
+		d.Digits -= 16
+	}
+	if quot, rem := bits.Div64(0, d.Fraction, 100000000); rem == 0 { // Check for 8 zeros
+		d.Fraction = quot
+		d.Digits -= 8
+	}
+	if quot, rem := bits.Div64(0, d.Fraction, 10000); rem == 0 { // Check for 4 zeros
+		d.Fraction = quot
+		d.Digits -= 4
+	}
+	if quot, rem := bits.Div64(0, d.Fraction, 100); rem == 0 { // Check for 2 zeros
+		d.Fraction = quot
+		d.Digits -= 2
+	}
+	if quot, rem := bits.Div64(0, d.Fraction, 10); rem == 0 { // Check for 1 zero
+		d.Fraction = quot
+		d.Digits -= 1
+	}
+
 	return d
 }

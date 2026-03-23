@@ -18,6 +18,9 @@ func TestDecimal_MarshalJSON(t *testing.T) {
 		{"integer", decimal.Decimal{Integer: 123}, []byte("123"), false},
 		{"fraction", decimal.Decimal{Fraction: 123, Digits: 3}, []byte("0.123"), false},
 		{"digits", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, []byte("123.123"), false},
+		{"negative_integer", decimal.Decimal{Integer: 123, Negative: true}, []byte("-123"), false},
+		{"negative_fraction", decimal.Decimal{Integer: 123, Fraction: 456, Digits: 3, Negative: true}, []byte("-123.456"), false},
+		{"max_uint64_integer", decimal.Decimal{Integer: ^uint64(0)}, []byte("18446744073709551615"), false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -73,8 +76,8 @@ func TestDecimal_UnmarshalJSON(t *testing.T) {
 		{"integer", decimal.Decimal{}, []byte("123.0"), false},
 		{"fraction", decimal.Decimal{}, []byte("0.123"), false},
 		{"digits", decimal.Decimal{}, []byte("123.123"), false},
+		{"null", decimal.Decimal{}, []byte("null"), false},
 		{"invalid", decimal.Decimal{}, []byte("123.123.123"), true},
-		{"null", decimal.Decimal{}, []byte("null"), true},
 		{"true", decimal.Decimal{}, []byte("true"), true},
 		{"false", decimal.Decimal{}, []byte("false"), true},
 		{"empty_array", decimal.Decimal{}, []byte("[]"), true},
@@ -105,8 +108,10 @@ func TestDecimal_UnmarshalJSON_struct(t *testing.T) {
 		{"integer", []byte(`{"d":123.0}`), false, 123.0},
 		{"fraction", []byte(`{"d":0.123}`), false, 0.123},
 		{"digits", []byte(`{"d":123.123}`), false, 123.123},
+		{"null", []byte(`{"d":null}`), false, 0.0},
+		{"maxuint64_string", []byte(`{"d":"18446744073709551615"}`), false, 18446744073709551615.0},
+		{"maxuint64_plus_one_string", []byte(`{"d":"18446744073709551616"}`), true, 0.0},
 		{"invalid", []byte(`{"d":123.123.123}`), true, 0.0},
-		{"null", []byte(`{"d":null}`), true, 0.0},
 		{"true", []byte(`{"d":true}`), true, 0.0},
 		{"false", []byte(`{"d":false}`), true, 0.0},
 		{"empty_array", []byte(`{"d":[]}`), true, 0.0},
@@ -130,9 +135,28 @@ func TestDecimal_UnmarshalJSON_struct(t *testing.T) {
 	}
 }
 
+func TestDecimal_UnmarshalJSON_ErrorKeepsReceiver(t *testing.T) {
+	d := decimal.Decimal{Integer: 7, Fraction: 5, Digits: 1}
+	if err := d.UnmarshalJSON([]byte("bad")); err == nil {
+		t.Fatal("UnmarshalJSON(bad) error = nil, want non-nil")
+	}
+	if d != (decimal.Decimal{Integer: 7, Fraction: 5, Digits: 1}) {
+		t.Errorf("UnmarshalJSON(bad) changed receiver: got %#v", d)
+	}
+
+	d = decimal.Decimal{Integer: 7, Fraction: 5, Digits: 1}
+	if err := d.UnmarshalJSON([]byte(`"18446744073709551616"`)); err == nil {
+		t.Fatal("UnmarshalJSON(overflow string) error = nil, want non-nil")
+	}
+	if d != (decimal.Decimal{Integer: 7, Fraction: 5, Digits: 1}) {
+		t.Errorf("UnmarshalJSON(overflow string) changed receiver: got %#v", d)
+	}
+}
+
 func BenchmarkDecimal_UnmarshalJSON(b *testing.B) {
 	d := decimal.Decimal{}
+	data := []byte("123.123")
 	for b.Loop() {
-		_ = d.UnmarshalJSON([]byte("123.123"))
+		_ = d.UnmarshalJSON(data)
 	}
 }

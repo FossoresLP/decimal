@@ -71,10 +71,6 @@ func (d Decimal) MarshalCBOR() ([]byte, error) {
 	out[0] = CBOR_TAG_DECIMALFRAC
 	out[1] = CBOR_ARRAY_LEN2
 
-	if d.Digits >= uint8(len(pow10)) {
-		return nil, fmt.Errorf("decimal: Digits (%d) out of range for encoding", d.Digits)
-	}
-
 	out[2] = CBOR_INTNEG | (d.Digits - 1)
 
 	hi, lo := bits.Mul64(d.Integer, pow10[d.Digits])
@@ -100,16 +96,16 @@ func (d Decimal) MarshalCBOR() ([]byte, error) {
 		out[4] = CBOR_BYTESTRING | byte(bytes)
 		binary.BigEndian.PutUint64(out[8:], hi)
 		binary.BigEndian.PutUint64(out[16:], lo)
-		copy(out[5:], out[23-bytes:])
-		return out[:4+bytes], nil
+		copy(out[5:], out[24-bytes:])
+		return out[:5+bytes], nil
 	}
 	out[3] = CBOR_TAG_BIGNUMPOS
 	bytes := 16 - bits.LeadingZeros64(hi)/8
 	out[4] = CBOR_BYTESTRING | byte(bytes)
 	binary.BigEndian.PutUint64(out[8:], hi)
 	binary.BigEndian.PutUint64(out[16:], lo)
-	copy(out[5:], out[23-bytes:])
-	return out[:4+bytes], nil
+	copy(out[5:], out[24-bytes:])
+	return out[:5+bytes], nil
 }
 
 func cborParseInt(buf []byte) (uint64, int, bool, error) {
@@ -171,8 +167,6 @@ func cborParseInt(buf []byte) (uint64, int, bool, error) {
 
 // UnmarshalCBOR implements the cbor.Unmarshaler interface.
 // It supports decoding RFC 8949 Decimal Fractions, standard floats, and integers.
-// This implementation uses a fast path for mantissas that fit in a 64-bit integer
-// and a slower path using math/big for larger numbers.
 func (d *Decimal) UnmarshalCBOR(data []byte) error {
 	if len(data) < 1 {
 		return fmt.Errorf("cbor: input too short at %d bytes", len(data))
@@ -235,7 +229,7 @@ func (d *Decimal) UnmarshalCBOR(data []byte) error {
 				return nil
 			case CBOR_TAG:
 				mantNeg := false
-				switch data[2+expBytes] & CBOR_ADDITIONAL {
+				switch data[2+expBytes] {
 				case CBOR_TAG_BIGNUMNEG:
 					mantNeg = true
 					fallthrough
@@ -250,18 +244,23 @@ func (d *Decimal) UnmarshalCBOR(data []byte) error {
 					if mantBytes > 16 {
 						return fmt.Errorf("cbor: bignum for mantissa is too large for decimal value")
 					}
-					if len(data) < 2+expBytes+2+mantBytes {
-						return fmt.Errorf("cbor: not enough data for mantissa in decimal fraction, expected %d, got %d", mantBytes, len(data)-2-expBytes-2)
+					if len(data) != 2+expBytes+2+mantBytes {
+						return fmt.Errorf("cbor: incorrect number of bytes for mantissa in decimal fraction, expected %d, got %d", mantBytes, len(data)-2-expBytes-2)
 					}
 					buf := [16]byte{}
 					copy(buf[16-mantBytes:], data[2+expBytes+2:])
 					hi := binary.BigEndian.Uint64(buf[:8])
 					lo := binary.BigEndian.Uint64(buf[8:])
+					if mantNeg {
+						carry := uint64(0)
+						lo, carry = bits.Add64(lo, 1, 0)
+						hi += carry
+					}
 					if !expNeg {
 						if hi != 0 {
 							return fmt.Errorf("cbor: decimal fraction overflows uint64")
 						}
-						overflow, val := bits.Mul64(lo, expVal)
+						overflow, val := bits.Mul64(lo, pow10[expVal])
 						if overflow != 0 {
 							return fmt.Errorf("cbor: decimal fraction overflows uint64")
 						}
@@ -271,10 +270,10 @@ func (d *Decimal) UnmarshalCBOR(data []byte) error {
 						d.Negative = mantNeg
 						return nil
 					}
-					if expVal <= hi {
+					if pow10[expVal] <= hi {
 						return fmt.Errorf("cbor: decimal fraction overflows uint64")
 					}
-					d.Integer, d.Fraction = bits.Div64(hi, lo, expVal)
+					d.Integer, d.Fraction = bits.Div64(hi, lo, pow10[expVal])
 					d.Digits = uint8(expVal)
 					d.Negative = mantNeg
 					return nil
@@ -295,19 +294,19 @@ func (d *Decimal) UnmarshalCBOR(data []byte) error {
 			if len(data) != 3 {
 				return fmt.Errorf("cbor: unexpected length %d for float16", len(data))
 			}
-			d.FromFloat64(float64(float16.Frombits(binary.BigEndian.Uint16(data[1:])).Float32()))
+			*d = New(float16.Frombits(binary.BigEndian.Uint16(data[1:])).Float32())
 			return nil
 		case CBOR_FLOAT32:
 			if len(data) != 5 {
 				return fmt.Errorf("cbor: unexpected length %d for float32", len(data))
 			}
-			d.FromFloat64(float64(math.Float32frombits(binary.BigEndian.Uint32(data[1:]))))
+			*d = New(math.Float32frombits(binary.BigEndian.Uint32(data[1:])))
 			return nil
 		case CBOR_FLOAT64:
 			if len(data) != 9 {
 				return fmt.Errorf("cbor: unexpected length %d for float64", len(data))
 			}
-			d.FromFloat64(math.Float64frombits(binary.BigEndian.Uint64(data[1:])))
+			*d = New(math.Float64frombits(binary.BigEndian.Uint64(data[1:])))
 			return nil
 		default:
 			return fmt.Errorf("cbor: unexpected simple value %d, cannot parse as decimal", data[0]&CBOR_ADDITIONAL)

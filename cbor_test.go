@@ -1,191 +1,204 @@
 package decimal_test
 
 import (
-	"encoding/json"
+	"encoding/hex"
+	"strings"
 	"testing"
 
 	"github.com/fossoreslp/decimal"
 )
 
-func TestDecimal_MarshalCBOR(t *testing.T) {
-	tests := []struct {
-		name    string
-		d       decimal.Decimal
-		wantErr bool
-	}{
-		{"zero", decimal.Decimal{}, false},
-		{"integer", decimal.Decimal{Integer: 123}, false},
-		{"fraction", decimal.Decimal{Fraction: 123, Digits: 3}, false},
-		{"digits", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, false},
-		{"negative", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3, Negative: true}, false},
-		{"large_integer", decimal.Decimal{Integer: 1234567890123456789}, false},
-		{"large_fraction", decimal.Decimal{Integer: 123, Fraction: 1234567890123456789, Digits: 19}, false},
-		{"max_uint64", decimal.Decimal{Integer: 18446744073709551615}, false},
-		{"zero_with_digits", decimal.Decimal{Integer: 0, Fraction: 0, Digits: 5}, false},
-		{"trailing_zeros", decimal.Decimal{Integer: 123, Fraction: 45000, Digits: 5}, false},
-		{"leading_zeros", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 5}, false},
+type cborMarshalFixture struct {
+	name string
+	d    decimal.Decimal
+	hex  string
+}
+
+type cborUnmarshalFixture struct {
+	name string
+	hex  string
+	want decimal.Decimal
+}
+
+func mustCBORHex(t *testing.T, s string) []byte {
+	t.Helper()
+	return cborHex(s)
+}
+
+func cborHex(s string) []byte {
+	s = strings.ReplaceAll(s, " ", "")
+	buf, err := hex.DecodeString(s)
+	if err != nil {
+		panic(err)
 	}
+	return buf
+}
+
+func assertDecimalExact(t *testing.T, got, want decimal.Decimal) {
+	t.Helper()
+	if got != want {
+		t.Fatalf("got %#v, want %#v", got, want)
+	}
+}
+
+func TestDecimal_MarshalCBOR_Exact(t *testing.T) {
+	tests := []cborMarshalFixture{
+		{"zero", decimal.Decimal{}, "00"},
+		{"one", decimal.Decimal{Integer: 1}, "01"},
+		{"negative_one", decimal.Decimal{Integer: 1, Negative: true}, "20"},
+		{"integer", decimal.Decimal{Integer: 123}, "187b"},
+		{"negative_integer", decimal.Decimal{Integer: 123, Negative: true}, "387a"},
+		{"uint16_range", decimal.Decimal{Integer: 1000}, "1903e8"},
+		{"large_integer", decimal.Decimal{Integer: 1234567890123456789}, "1b112210f47de98115"},
+		{"max_uint64", decimal.Decimal{Integer: 18446744073709551615}, "1bffffffffffffffff"},
+		{"fraction", decimal.Decimal{Fraction: 123, Digits: 3}, "c48222187b"},
+		{"digits", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, "c482221a0001e0f3"},
+		{"negative_fraction", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3, Negative: true}, "c482223a0001e0f2"},
+		{"zero_with_digits", decimal.Decimal{Digits: 5}, "c4822400"},
+		{"trailing_zeros", decimal.Decimal{Integer: 123, Fraction: 45000, Digits: 5}, "c482241a00bc5ea8"},
+		{"leading_zeros", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 5}, "c482241a00bbaf5b"},
+		{"small_fraction", decimal.Decimal{Fraction: 1, Digits: 18}, "c4823101"},
+		{"max_digits", decimal.Decimal{Integer: 123, Fraction: 12345678901234567, Digits: 17}, "c482301baade3d294eb94b87"},
+		{"point_five", decimal.Decimal{Fraction: 5, Digits: 1}, "c4822005"},
+		{"negative_point_five", decimal.Decimal{Fraction: 5, Digits: 1, Negative: true}, "c4822024"},
+		{"complex", decimal.Decimal{Integer: 987654321, Fraction: 123456789, Digits: 9}, "c482281b0db4da5f4b717715"},
+		{"bignum_positive", decimal.Decimal{Integer: 123, Fraction: 1234567890123456789, Digits: 19}, "c48232c24942becfe422c0618115"},
+		{"bignum_negative", decimal.Decimal{Negative: true, Integer: 123, Fraction: 1234567890123456789, Digits: 19}, "c48232c34942becfe422c0618114"},
+		{"bignum_large", decimal.Decimal{Integer: 999999999999999999, Fraction: 9999999999999999999, Digits: 19}, "c48232c2500785ee10d5da46d900f4369fffffffff"},
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.d.MarshalCBOR()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Decimal.MarshalCBOR() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !tt.wantErr && got == nil {
-				t.Errorf("Decimal.MarshalCBOR() returned nil without error")
-			}
-		})
-	}
-}
-
-func TestDecimal_UnmarshalCBOR(t *testing.T) {
-	tests := []struct {
-		name    string
-		d       decimal.Decimal
-		want    decimal.Decimal
-		wantErr bool
-	}{
-		{"zero", decimal.Decimal{}, decimal.Decimal{}, false},
-		{"integer", decimal.Decimal{Integer: 123}, decimal.Decimal{Integer: 123}, false},
-		{"fraction", decimal.Decimal{Fraction: 123, Digits: 3}, decimal.Decimal{Fraction: 123, Digits: 3}, false},
-		{"digits", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, false},
-		{"negative", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3, Negative: true}, decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3, Negative: true}, false},
-		{"large_integer", decimal.Decimal{Integer: 1234567890123456789}, decimal.Decimal{Integer: 1234567890123456789}, false},
-		{"max_uint64", decimal.Decimal{Integer: 18446744073709551615}, decimal.Decimal{Integer: 18446744073709551615}, false},
-		{"zero_with_digits", decimal.Decimal{Integer: 0, Fraction: 0, Digits: 5}, decimal.Decimal{Integer: 0, Fraction: 0, Digits: 5}, false},
-		{"trailing_zeros", decimal.Decimal{Integer: 123, Fraction: 45000, Digits: 5}, decimal.Decimal{Integer: 123, Fraction: 45000, Digits: 5}, false},
-		{"leading_zeros", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 5}, decimal.Decimal{Integer: 123, Fraction: 123, Digits: 5}, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			data, err := tt.d.MarshalCBOR()
 			if err != nil {
 				t.Fatalf("MarshalCBOR() error = %v", err)
 			}
-			var result decimal.Decimal
-			if err := result.UnmarshalCBOR(data); (err != nil) != tt.wantErr {
-				t.Errorf("Decimal.UnmarshalCBOR() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !result.Equal(tt.want) {
-				t.Errorf("Decimal.UnmarshalCBOR() = %#v, want %#v", result, tt.want)
+			want := mustCBORHex(t, tt.hex)
+			if string(got) != string(want) {
+				t.Fatalf("MarshalCBOR() = %x, want %x", got, want)
 			}
 		})
 	}
 }
 
-func TestDecimal_UnmarshalCBOR_Float(t *testing.T) {
-	tests := []struct {
-		name  string
-		value any
-	}{
-		{"float32", float32(123.456)},
-		{"float64", float64(123.456)},
-		{"int", int(123)},
-		{"int64", int64(123)},
-		{"uint", uint(123)},
-		{"uint64", uint64(123)},
+func TestDecimal_UnmarshalCBOR_Exact(t *testing.T) {
+	tests := []cborUnmarshalFixture{
+		{"zero", "00", decimal.Decimal{}},
+		{"one", "01", decimal.Decimal{Integer: 1}},
+		{"negative_one", "20", decimal.Decimal{Integer: 1, Negative: true}},
+		{"integer", "187b", decimal.Decimal{Integer: 123}},
+		{"negative_integer", "387a", decimal.Decimal{Integer: 123, Negative: true}},
+		{"uint16_range", "1903e8", decimal.Decimal{Integer: 1000}},
+		{"large_integer", "1b112210f47de98115", decimal.Decimal{Integer: 1234567890123456789}},
+		{"max_uint64", "1bffffffffffffffff", decimal.Decimal{Integer: 18446744073709551615}},
+		{"fraction", "c48222187b", decimal.Decimal{Fraction: 123, Digits: 3}},
+		{"digits", "c482221a0001e0f3", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}},
+		{"negative_fraction", "c482223a0001e0f2", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3, Negative: true}},
+		{"zero_with_digits", "c4822400", decimal.Decimal{Digits: 5}},
+		{"trailing_zeros", "c482241a00bc5ea8", decimal.Decimal{Integer: 123, Fraction: 45000, Digits: 5}},
+		{"leading_zeros", "c482241a00bbaf5b", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 5}},
+		{"small_fraction", "c4823101", decimal.Decimal{Fraction: 1, Digits: 18}},
+		{"max_digits", "c482301baade3d294eb94b87", decimal.Decimal{Integer: 123, Fraction: 12345678901234567, Digits: 17}},
+		{"point_five", "c4822005", decimal.Decimal{Fraction: 5, Digits: 1}},
+		{"negative_point_five", "c4822024", decimal.Decimal{Fraction: 5, Digits: 1, Negative: true}},
+		{"complex", "c482281b0db4da5f4b717715", decimal.Decimal{Integer: 987654321, Fraction: 123456789, Digits: 9}},
+		{"bignum_positive", "c48232c24942becfe422c0618115", decimal.Decimal{Integer: 123, Fraction: 1234567890123456789, Digits: 19}},
+		{"bignum_negative", "c48232c34942becfe422c0618114", decimal.Decimal{Negative: true, Integer: 123, Fraction: 1234567890123456789, Digits: 19}},
+		{"bignum_large", "c48232c2500785ee10d5da46d900f4369fffffffff", decimal.Decimal{Integer: 999999999999999999, Fraction: 9999999999999999999, Digits: 19}},
+		{"positive_exponent", "c4820205", decimal.Decimal{Integer: 500}},
+		{"positive_exponent_bignum", "c48202c24105", decimal.Decimal{Integer: 500}},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create CBOR-encoded data with the value
-			data, err := json.Marshal(tt.value)
-			if err != nil {
-				t.Fatalf("json.Marshal() error = %v", err)
-			}
-
-			var d decimal.Decimal
-			// Note: This test verifies the backward compatibility path exists
-			// The actual CBOR encoding would be different, but we're testing
-			// that the unmarshal logic can handle different types
-			_ = d
-			_ = data
-		})
-	}
-}
-
-func TestDecimal_MarshalUnmarshalCBOR_RoundTrip(t *testing.T) {
-	tests := []struct {
-		name string
-		d    decimal.Decimal
-	}{
-		{"zero", decimal.Decimal{}},
-		{"integer", decimal.Decimal{Integer: 123}},
-		{"fraction", decimal.Decimal{Fraction: 123, Digits: 3}},
-		{"digits", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}},
-		{"negative_integer", decimal.Decimal{Integer: 123, Negative: true}},
-		{"negative_fraction", decimal.Decimal{Integer: 123, Fraction: 456, Digits: 3, Negative: true}},
-		{"large_integer", decimal.Decimal{Integer: 9999999999999999999}},
-		{"small_fraction", decimal.Decimal{Fraction: 1, Digits: 18}},
-		{"max_digits", decimal.Decimal{Integer: 123, Fraction: 12345678901234567, Digits: 17}},
-		{"one", decimal.Decimal{Integer: 1}},
-		{"negative_one", decimal.Decimal{Integer: 1, Negative: true}},
-		{"point_five", decimal.Decimal{Fraction: 5, Digits: 1}},
-		{"negative_point_five", decimal.Decimal{Fraction: 5, Digits: 1, Negative: true}},
-		{"complex", decimal.Decimal{Integer: 987654321, Fraction: 123456789, Digits: 9}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Marshal
-			data, err := tt.d.MarshalCBOR()
-			if err != nil {
-				t.Fatalf("MarshalCBOR() error = %v", err)
-			}
-
-			// Unmarshal
-			var result decimal.Decimal
-			if err := result.UnmarshalCBOR(data); err != nil {
+			var got decimal.Decimal
+			if err := got.UnmarshalCBOR(mustCBORHex(t, tt.hex)); err != nil {
 				t.Fatalf("UnmarshalCBOR() error = %v", err)
 			}
-
-			// Compare
-			if !result.Equal(tt.d) {
-				t.Errorf("Round trip failed: got %#v, want %#v", result, tt.d)
-			}
-
-			// Verify string representation matches
-			if result.String() != tt.d.String() {
-				t.Errorf("String mismatch after round trip: got %s, want %s", result.String(), tt.d.String())
-			}
+			assertDecimalExact(t, got, tt.want)
 		})
 	}
 }
 
-func TestDecimal_MarshalCBOR_PreservesTrailingZeros(t *testing.T) {
-	// This test verifies that trailing zeros in the fraction are preserved
-	// through CBOR marshal/unmarshal, similar to the JSON test
-	d := decimal.Decimal{Integer: 123, Fraction: 12345, Digits: 5}
-
-	data, err := d.MarshalCBOR()
-	if err != nil {
-		t.Fatalf("MarshalCBOR() error = %v", err)
+func TestDecimal_UnmarshalCBOR_Floats(t *testing.T) {
+	tests := []cborUnmarshalFixture{
+		{"float16_1_5", "f93e00", decimal.Decimal{Integer: 1, Fraction: 5, Digits: 1}},
+		{"float32_1_5", "fa3fc00000", decimal.Decimal{Integer: 1, Fraction: 5, Digits: 1}},
+		{"float64_1_5", "fb3ff8000000000000", decimal.Decimal{Integer: 1, Fraction: 5, Digits: 1}},
+		{"float16_negative_1_5", "f9be00", decimal.Decimal{Integer: 1, Fraction: 5, Digits: 1, Negative: true}},
+		{"float32_123_5", "fa42f70000", decimal.Decimal{Integer: 123, Fraction: 5, Digits: 1}},
+		{"float64_123_5", "fb405ee00000000000", decimal.Decimal{Integer: 123, Fraction: 5, Digits: 1}},
+		{"float64_negative_subnormal", "fb8000000000000001", decimal.Decimal{}},
 	}
 
-	var result decimal.Decimal
-	if err := result.UnmarshalCBOR(data); err != nil {
-		t.Fatalf("UnmarshalCBOR() error = %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got decimal.Decimal
+			if err := got.UnmarshalCBOR(mustCBORHex(t, tt.hex)); err != nil {
+				t.Fatalf("UnmarshalCBOR() error = %v", err)
+			}
+			assertDecimalExact(t, got, tt.want)
+		})
+	}
+}
+
+func TestDecimal_UnmarshalCBOR_TrailingGarbage(t *testing.T) {
+	data := mustCBORHex(t, "c48232c24942becfe422c0618115")
+	data = append(data, 0x00)
+
+	var out decimal.Decimal
+	if err := out.UnmarshalCBOR(data); err == nil {
+		t.Fatal("UnmarshalCBOR should reject trailing garbage on bignum mantissa path")
+	}
+}
+
+func TestDecimal_UnmarshalCBOR_Errors(t *testing.T) {
+	tests := []struct {
+		name string
+		hex  string
+	}{
+		{"empty", ""},
+		{"truncated_int_24", "18"},
+		{"truncated_int_25", "1901"},
+		{"truncated_int_26", "1a0102"},
+		{"truncated_int_27", "1b01"},
+		{"invalid_additional", "1c"},
+		{"neg_overflow", "3bffffffffffffffff"},
+		{"int_trailing", "0100"},
+		{"unsupported_major", "60"},
+		{"unknown_tag", "c1"},
+		{"bignum_tag", "c24101"},
+		{"decfrac_too_short", "c482"},
+		{"decfrac_bad_array", "c48100"},
+		{"decfrac_exp_overflow", "c482181500"},
+		{"float16_wrong_len", "f900"},
+		{"float32_wrong_len", "fa0000"},
+		{"float64_wrong_len", "fb000000"},
+		{"unknown_simple", "f4"},
+		{"decfrac_mantissa_truncated", "c48200"},
+		{"decfrac_mantissa_bad_major", "c4820060"},
+		{"decfrac_mantissa_bad_tag", "c48200c1"},
+		{"decfrac_mantissa_trailing", "c482000100"},
+		{"decfrac_bignum_truncated", "c48200c2"},
+		{"decfrac_bignum_not_bytes", "c48200c260"},
+		{"decfrac_bignum_too_large", "c48200c2510102030405060708090a0b0c0d0e0f1011"},
+		{"decfrac_bad_array_len", "c4830000"},
+		{"decfrac_exp_bad_type", "c4824000"},
+		{"decfrac_mantissa_after_long_exp", "c4821801"},
+		{"decfrac_mantissa_parse_err", "c4820018"},
+		{"decfrac_pos_exp_overflow", "c482121bffffffffffffffff"},
+		{"decfrac_bignum_pos_exp_hi_overflow", "c48201c249010000000000000001"},
+		{"decfrac_bignum_pos_exp_mul_overflow", "c48212c248ffffffffffffffff"},
+		{"decfrac_bignum_neg_exp_hi_overflow", "c48220c249ff0000000000000001"},
 	}
 
-	if result.String() != "123.12345" {
-		t.Errorf("String representation = %s, want 123.12345", result.String())
-	}
-
-	// Test with trailing zeros
-	d.Fraction = 1234500
-	d.Digits = 7
-
-	data, err = d.MarshalCBOR()
-	if err != nil {
-		t.Fatalf("MarshalCBOR() error = %v", err)
-	}
-
-	if err := result.UnmarshalCBOR(data); err != nil {
-		t.Fatalf("UnmarshalCBOR() error = %v", err)
-	}
-
-	if result.String() != "123.1234500" {
-		t.Errorf("String representation = %s, want 123.1234500", result.String())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var d decimal.Decimal
+			if err := d.UnmarshalCBOR(mustCBORHex(t, tt.hex)); err == nil {
+				t.Fatalf("UnmarshalCBOR(%s) should have returned an error", tt.hex)
+			}
+		})
 	}
 }
 
@@ -197,8 +210,7 @@ func BenchmarkDecimal_MarshalCBOR(b *testing.B) {
 }
 
 func BenchmarkDecimal_UnmarshalCBOR(b *testing.B) {
-	d := decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}
-	data, _ := d.MarshalCBOR()
+	data := cborHex("c482221a0001e0f3")
 	var result decimal.Decimal
 	for b.Loop() {
 		_ = result.UnmarshalCBOR(data)
