@@ -2,6 +2,7 @@ package decimal
 
 import (
 	"fmt"
+	"unsafe"
 )
 
 const cutoff = ^uint64(0) / 10 // 1844674407370955161
@@ -175,4 +176,19 @@ func (d Decimal) String() string {
 		pos++
 	}
 	return string(arr[pos:])
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (d Decimal) MarshalText() ([]byte, error) {
+	return d.MarshalJSON()
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (d *Decimal) UnmarshalText(data []byte) error {
+	val, err := NewFromString(unsafe.String(unsafe.SliceData(data), len(data)))
+	if err != nil {
+		return err
+	}
+	*d = val
+	return nil
 }

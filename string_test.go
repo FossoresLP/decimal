@@ -1,9 +1,17 @@
 package decimal_test
 
 import (
+	"encoding"
+	"encoding/xml"
 	"testing"
 
 	"github.com/fossoreslp/decimal"
+)
+
+// Compile-time interface checks.
+var (
+	_ encoding.TextMarshaler   = decimal.Decimal{}
+	_ encoding.TextUnmarshaler = (*decimal.Decimal)(nil)
 )
 
 func TestDecimal_NewFromString(t *testing.T) {
@@ -229,5 +237,146 @@ func BenchmarkDecimal_String(b *testing.B) {
 				_ = bb.d.String()
 			}
 		})
+	}
+}
+
+func TestDecimal_MarshalText(t *testing.T) {
+	tests := []struct {
+		name string
+		d    decimal.Decimal
+		want string
+	}{
+		{"zero", decimal.Decimal{}, "0"},
+		{"integer", decimal.Decimal{Integer: 123}, "123"},
+		{"fraction", decimal.Decimal{Fraction: 123, Digits: 3}, "0.123"},
+		{"digits", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, "123.123"},
+		{"negative_integer", decimal.Decimal{Integer: 123, Negative: true}, "-123"},
+		{"negative_fraction", decimal.Decimal{Integer: 123, Fraction: 456, Digits: 3, Negative: true}, "-123.456"},
+		{"max_uint64_integer", decimal.Decimal{Integer: ^uint64(0)}, "18446744073709551615"},
+		{"trailing_zeros", decimal.Decimal{Integer: 123, Fraction: 1234500, Digits: 7}, "123.1234500"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.d.MarshalText()
+			if err != nil {
+				t.Fatalf("MarshalText() error = %v", err)
+			}
+			if string(got) != tt.want {
+				t.Errorf("MarshalText() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func BenchmarkDecimal_MarshalText(b *testing.B) {
+	d := decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}
+	for b.Loop() {
+		_, _ = d.MarshalText()
+	}
+}
+
+func TestDecimal_UnmarshalText(t *testing.T) {
+	tests := []struct {
+		name    string
+		data    string
+		want    decimal.Decimal
+		wantErr bool
+	}{
+		{"zero", "0", decimal.Decimal{}, false},
+		{"zero_frac", "0.0", decimal.Decimal{Digits: 1}, false},
+		{"integer", "123", decimal.Decimal{Integer: 123}, false},
+		{"fraction", "0.123", decimal.Decimal{Fraction: 123, Digits: 3}, false},
+		{"digits", "123.123", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, false},
+		{"negative", "-42.5", decimal.Decimal{Integer: 42, Fraction: 5, Digits: 1, Negative: true}, false},
+		{"max_uint64", "18446744073709551615", decimal.Decimal{Integer: 18446744073709551615}, false},
+		{"overflow", "18446744073709551616", decimal.Decimal{}, true},
+		{"invalid", "abc", decimal.Decimal{}, true},
+		{"empty", "", decimal.Decimal{}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var d decimal.Decimal
+			err := d.UnmarshalText([]byte(tt.data))
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("UnmarshalText() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !tt.wantErr && !d.Equal(tt.want) {
+				t.Errorf("UnmarshalText() = %v, want %v", d, tt.want)
+			}
+		})
+	}
+}
+
+func BenchmarkDecimal_UnmarshalText(b *testing.B) {
+	var d decimal.Decimal
+	data := []byte("123.123")
+	for b.Loop() {
+		_ = d.UnmarshalText(data)
+	}
+}
+
+func TestDecimal_UnmarshalText_ErrorKeepsReceiver(t *testing.T) {
+	d := decimal.Decimal{Integer: 7, Fraction: 5, Digits: 1}
+	if err := d.UnmarshalText([]byte("bad")); err == nil {
+		t.Fatal("UnmarshalText(bad) error = nil, want non-nil")
+	}
+	if d != (decimal.Decimal{Integer: 7, Fraction: 5, Digits: 1}) {
+		t.Errorf("UnmarshalText(bad) changed receiver: got %#v", d)
+	}
+}
+
+func TestDecimal_TextRoundTrip(t *testing.T) {
+	tests := []struct {
+		name string
+		d    decimal.Decimal
+	}{
+		{"zero", decimal.Decimal{}},
+		{"integer", decimal.Decimal{Integer: 42}},
+		{"negative_integer", decimal.Decimal{Integer: 42, Negative: true}},
+		{"fraction", decimal.Decimal{Fraction: 125, Digits: 3}},
+		{"combined", decimal.Decimal{Integer: 123, Fraction: 456, Digits: 3}},
+		{"max_uint64", decimal.Decimal{Integer: ^uint64(0)}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data, err := tt.d.MarshalText()
+			if err != nil {
+				t.Fatalf("MarshalText() error = %v", err)
+			}
+			var got decimal.Decimal
+			if err := got.UnmarshalText(data); err != nil {
+				t.Fatalf("UnmarshalText(%q) error = %v", data, err)
+			}
+			if got != tt.d {
+				t.Errorf("round-trip mismatch: got %#v, want %#v", got, tt.d)
+			}
+		})
+	}
+}
+
+func TestDecimal_XML(t *testing.T) {
+	type S struct {
+		XMLName xml.Name        `xml:"root"`
+		D       decimal.Decimal `xml:"d"`
+	}
+
+	// Marshal
+	s := S{D: decimal.Decimal{Integer: 123, Fraction: 456, Digits: 3}}
+	data, err := xml.Marshal(s)
+	if err != nil {
+		t.Fatalf("xml.Marshal() error = %v", err)
+	}
+	want := "<root><d>123.456</d></root>"
+	if string(data) != want {
+		t.Errorf("xml.Marshal() = %q, want %q", data, want)
+	}
+
+	// Unmarshal
+	var got S
+	if err := xml.Unmarshal(data, &got); err != nil {
+		t.Fatalf("xml.Unmarshal() error = %v", err)
+	}
+	if got.D != s.D {
+		t.Errorf("xml.Unmarshal() = %#v, want %#v", got.D, s.D)
 	}
 }
