@@ -50,7 +50,7 @@ func main() {
 	a, _ := decimal.NewFromString("123.4500")
 	b := decimal.New(2)
 
-	sum := a.Add(b)
+	sum := decimal.Add(a, b)
 	expected, _ := decimal.NewFromString("125.45")
 
 	fmt.Println(a.String())          // 123.4500
@@ -114,17 +114,22 @@ This is intended for loose extraction, not strict validation.
 
 The package currently provides:
 
-- `Add(Decimal) Decimal`
-- `MultiplyUint64(uint64) Decimal`
-- `DivideUint64(uint64) Decimal`
-
-Subtraction is possible by adding a value with the sign bit flipped.
+- `Add(a, b) Decimal`
+- `Subtract(a, b) Decimal`
+- `Multiply(a, b) Decimal`
+- `Divide(a, b) Decimal`
+- `Negate(n) Decimal`
+- `Absolute(n) Decimal`
 
 ### Arithmetic Semantics
 
-- `Add`, `MultiplyUint64`, and `DivideUint64` are designed to behave like primitive integer operations in Go with respect to overflow and division-by-zero semantics.
-- `MultiplyUint64` and `Add` may wrap on overflow.
-- `DivideUint64(0)` panics, matching Go integer division.
+Operations are designed to behave like primitive integer operations in Go with respect to overflow and division-by-zero semantics. They will wrap on overflow while divide-by-zero panics.
+
+Arithmetic operations will expand the number of decimal digits as far as necessary (up to the limit of 19 digits) to represent the result accurately.
+
+Operations that require more than 19 digits after the decimal point may lose precision.
+
+All arithmetic operations accept `Decimal` values as well as any of the primitive Go numeric types, converting to `Decimal` as described by `New`.
 
 ## Equality
 

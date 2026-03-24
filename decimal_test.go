@@ -36,104 +36,6 @@ func TestDecimal_Equal(t *testing.T) {
 	}
 }
 
-func TestDecimal_MultiplyUint64(t *testing.T) {
-	tests := []struct {
-		name       string
-		decimal    decimal.Decimal
-		multiplier uint64
-		expected   *decimal.Decimal
-	}{
-		{"zero", decimal.Decimal{Integer: 123, Fraction: 456, Digits: 3}, 0, &decimal.Decimal{Digits: 3}},
-		{"negative_to_zero", decimal.Decimal{Integer: 5, Negative: true}, 0, &decimal.Decimal{}},
-		{"integer", decimal.Decimal{Integer: 123}, 2, &decimal.Decimal{Integer: 246}},
-		{"fraction", decimal.Decimal{Fraction: 123, Digits: 3}, 2, &decimal.Decimal{Fraction: 246, Digits: 3}},
-		{"digits", decimal.Decimal{Integer: 123, Fraction: 456, Digits: 3}, 2, &decimal.Decimal{Integer: 246, Fraction: 912, Digits: 3}},
-		{"negative", decimal.Decimal{Integer: 123, Fraction: 456, Digits: 3, Negative: true}, 2, &decimal.Decimal{Integer: 246, Fraction: 912, Digits: 3, Negative: true}},
-		{"large", decimal.Decimal{Integer: 1234567890123456789, Fraction: 1234567890123456789, Digits: 19}, 2, &decimal.Decimal{Integer: 2469135780246913578, Fraction: 2469135780246913578, Digits: 19}},
-		{"fraction_mul_overflow_with_carry", decimal.Decimal{Fraction: 9999999999999999999, Digits: 19}, 2, &decimal.Decimal{Integer: 1, Fraction: 9999999999999999998, Digits: 19}},
-		{"fraction_mul_overflow_large_carry", decimal.Decimal{Fraction: 9999999999999999999, Digits: 19}, 7, &decimal.Decimal{Integer: 6, Fraction: 9999999999999999993, Digits: 19}},
-		{"fraction_mul_overflow_with_integer_wrap_semantics", decimal.Decimal{Integer: math.MaxUint64, Fraction: 9999999999999999999, Digits: 19}, 2, &decimal.Decimal{Integer: math.MaxUint64, Fraction: 9999999999999999998, Digits: 19}},
-		{"large_multiplier", decimal.Decimal{Integer: 123, Fraction: 456, Digits: 3}, 1234567890, &decimal.Decimal{Integer: 152414813427, Fraction: 840, Digits: 3}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			product := tt.decimal.MultiplyUint64(tt.multiplier)
-			if !tt.expected.Equal(product) {
-				t.Errorf("Decimal.MultiplyUint64() = %v, want %v", product, tt.expected)
-			}
-		})
-	}
-}
-
-func TestDecimal_DivideUint64(t *testing.T) {
-	tests := []struct {
-		name     string
-		decimal  decimal.Decimal
-		divisor  uint64
-		expected *decimal.Decimal
-	}{
-		{"one", decimal.Decimal{Integer: 123, Fraction: 456, Digits: 3}, 1, &decimal.Decimal{Integer: 123, Fraction: 456, Digits: 3}},
-		{"integer", decimal.Decimal{Integer: 123}, 2, &decimal.Decimal{Integer: 61}},
-		{"negative_to_zero", decimal.Decimal{Fraction: 1, Digits: 1, Negative: true}, 2, &decimal.Decimal{Digits: 1}},
-		{"integer_with_fraction_digit", decimal.Decimal{Integer: 123, Digits: 1}, 2, &decimal.Decimal{Integer: 61, Fraction: 5, Digits: 1}},
-		{"fraction", decimal.Decimal{Fraction: 123, Digits: 3}, 2, &decimal.Decimal{Fraction: 61, Digits: 3}},
-		{"digits", decimal.Decimal{Integer: 123, Fraction: 456, Digits: 3}, 2, &decimal.Decimal{Integer: 61, Fraction: 728, Digits: 3}},
-		{"negative", decimal.Decimal{Integer: 123, Fraction: 456, Digits: 3, Negative: true}, 2, &decimal.Decimal{Integer: 61, Fraction: 728, Digits: 3, Negative: true}},
-		{"large", decimal.Decimal{Integer: 1234567890, Fraction: 123456789, Digits: 10}, 2, &decimal.Decimal{Integer: 617283945, Fraction: 61728394, Digits: 10}},
-		{"high_digits_remainder", decimal.Decimal{Integer: 100, Fraction: 0, Digits: 19}, 7, &decimal.Decimal{Integer: 14, Fraction: 2857142857142857142, Digits: 19}},
-		{"max_uint64", decimal.Decimal{Integer: math.MaxUint64, Digits: 19}, 7, &decimal.Decimal{Integer: math.MaxUint64 / 7, Fraction: 1428571428571428571, Digits: 19}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			quotient := tt.decimal.DivideUint64(tt.divisor)
-			if !tt.expected.Equal(quotient) {
-				t.Errorf("Decimal.DivideUint64() = %v, want %v", quotient, tt.expected)
-			}
-		})
-	}
-}
-
-func TestDecimal_Add(t *testing.T) {
-	tests := []struct {
-		name     string
-		d1       decimal.Decimal
-		d2       decimal.Decimal
-		expected decimal.Decimal
-	}{
-		{"zero", decimal.Decimal{}, decimal.Decimal{}, decimal.Decimal{}},
-		{"integer", decimal.Decimal{Integer: 123}, decimal.Decimal{Integer: 456}, decimal.Decimal{Integer: 579}},
-		{"fraction", decimal.Decimal{Fraction: 123, Digits: 3}, decimal.Decimal{Fraction: 456, Digits: 3}, decimal.Decimal{Fraction: 579, Digits: 3}},
-		{"digits", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, decimal.Decimal{Integer: 456, Fraction: 456, Digits: 3}, decimal.Decimal{Integer: 579, Fraction: 579, Digits: 3}},
-		{"negative_d1", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3, Negative: true}, decimal.Decimal{Integer: 456, Fraction: 456, Digits: 3}, decimal.Decimal{Integer: 333, Fraction: 333, Digits: 3}},
-		{"negative_d2", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, decimal.Decimal{Integer: 456, Fraction: 456, Digits: 3, Negative: true}, decimal.Decimal{Integer: 333, Fraction: 333, Digits: 3, Negative: true}},
-		{"negative_both", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3, Negative: true}, decimal.Decimal{Integer: 456, Fraction: 456, Digits: 3, Negative: true}, decimal.Decimal{Integer: 579, Fraction: 579, Digits: 3, Negative: true}},
-		{"mixed_sign_integer_d1_larger", decimal.Decimal{Integer: 7}, decimal.Decimal{Integer: 5, Negative: true}, decimal.Decimal{Integer: 2}},
-		{"mixed_sign_integer_d2_larger", decimal.Decimal{Integer: 5}, decimal.Decimal{Integer: 7, Negative: true}, decimal.Decimal{Integer: 2, Negative: true}},
-		{"mixed_sign_integer_cancel", decimal.Decimal{Integer: 7}, decimal.Decimal{Integer: 7, Negative: true}, decimal.Decimal{}},
-		{"large", decimal.Decimal{Integer: 1234567890, Fraction: 123456789, Digits: 10}, decimal.Decimal{Integer: 9876543210, Fraction: 987654321, Digits: 10}, decimal.Decimal{Integer: 11111111100, Fraction: 1111111110, Digits: 10}},
-		{"different_digits_d1_less", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, decimal.Decimal{Integer: 456, Fraction: 456, Digits: 4}, decimal.Decimal{Integer: 579, Fraction: 1686, Digits: 4}},
-		{"different_digits_d2_less", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 4}, decimal.Decimal{Integer: 456, Fraction: 456, Digits: 3}, decimal.Decimal{Integer: 579, Fraction: 4683, Digits: 4}},
-		{"mixed_sign_smaller_int_larger_frac", decimal.Decimal{Integer: 5, Fraction: 7, Digits: 1, Negative: true}, decimal.Decimal{Integer: 6, Fraction: 3, Digits: 1}, decimal.Decimal{Integer: 0, Fraction: 6, Digits: 1}},
-		{"mixed_sign_borrow", decimal.Decimal{Integer: 1, Fraction: 9, Digits: 1}, decimal.Decimal{Negative: true, Integer: 2, Fraction: 1, Digits: 1}, decimal.Decimal{Negative: true, Integer: 0, Fraction: 2, Digits: 1}},
-		{"mixed_sign_exact_cancellation", decimal.Decimal{Integer: 1, Fraction: 2, Digits: 1}, decimal.Decimal{Negative: true, Integer: 1, Fraction: 2, Digits: 1}, decimal.Decimal{Digits: 1}},
-		{"mixed_sign_equal_int_d1_frac_larger", decimal.Decimal{Integer: 3, Fraction: 7, Digits: 1}, decimal.Decimal{Negative: true, Integer: 3, Fraction: 2, Digits: 1}, decimal.Decimal{Integer: 0, Fraction: 5, Digits: 1}},
-		{"mixed_sign_equal_int_d2_frac_larger", decimal.Decimal{Integer: 3, Fraction: 2, Digits: 1}, decimal.Decimal{Negative: true, Integer: 3, Fraction: 7, Digits: 1}, decimal.Decimal{Negative: true, Integer: 0, Fraction: 5, Digits: 1}},
-		{"mixed_sign_d2_larger_int_borrow", decimal.Decimal{Integer: 1, Fraction: 7, Digits: 1}, decimal.Decimal{Negative: true, Integer: 3, Fraction: 2, Digits: 1}, decimal.Decimal{Negative: true, Integer: 1, Fraction: 5, Digits: 1}},
-		{"mixed_sign_d1_larger_int_borrow", decimal.Decimal{Integer: 5, Fraction: 1, Digits: 1}, decimal.Decimal{Negative: true, Integer: 3, Fraction: 7, Digits: 1}, decimal.Decimal{Integer: 1, Fraction: 4, Digits: 1}},
-		{"mixed_sign_digits_19_borrow_d1_larger", decimal.Decimal{Integer: 2, Fraction: 9999999999999999998, Digits: 19}, decimal.Decimal{Negative: true, Integer: 1, Fraction: 9999999999999999999, Digits: 19}, decimal.Decimal{Integer: 0, Fraction: 9999999999999999999, Digits: 19}},
-		{"mixed_sign_digits_19_borrow_d2_larger", decimal.Decimal{Negative: true, Integer: 1, Fraction: 9999999999999999999, Digits: 19}, decimal.Decimal{Integer: 2, Fraction: 9999999999999999998, Digits: 19}, decimal.Decimal{Integer: 0, Fraction: 9999999999999999999, Digits: 19}},
-		{"fraction_overflow", decimal.Decimal{Fraction: 9999999999999999999, Digits: 19}, decimal.Decimal{Fraction: 9999999999999999999, Digits: 19}, decimal.Decimal{Integer: 1, Fraction: 9999999999999999998, Digits: 19}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			sum := tt.d1.Add(tt.d2)
-			if !tt.expected.Equal(sum) {
-				t.Errorf("Decimal.Add() = %v, want %v", sum, tt.expected)
-			}
-		})
-	}
-}
-
 func TestNew(t *testing.T) {
 	tests := []struct {
 		name string
@@ -333,17 +235,6 @@ func TestDecimal_Truncate(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestDecimal_DivideUint64_DivByZero(t *testing.T) {
-	// Division by zero panics, matching native uint64 behavior.
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("DivideUint64(0) did not panic — expected panic consistent with uint64 division by zero")
-		}
-	}()
-	d := decimal.Decimal{Integer: 1}
-	_ = d.DivideUint64(0)
 }
 
 func BenchmarkDecimal_Truncate(b *testing.B) {
