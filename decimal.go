@@ -8,7 +8,7 @@ import (
 var pow10 = [20]uint64{1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000, 10000000000, 100000000000, 1000000000000, 10000000000000, 100000000000000, 1000000000000000, 10000000000000000, 100000000000000000, 1000000000000000000, 10000000000000000000}
 
 type Number interface {
-	~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~int | ~int8 | ~int16 | ~int32 | ~int64 | ~float32 | ~float64
+	uint | uint8 | uint16 | uint32 | uint64 | int | int8 | int16 | int32 | int64 | float32 | float64 | Decimal
 }
 
 // New converts any of the builtin numeric types in Go to a decimal value.
@@ -18,53 +18,73 @@ type Number interface {
 // Floating point numbers exceeding the unsigned 64-bit integer range inherit Go's float-to-uint64 overflow logic.
 // Positive and negative infinity and NaN cannot be represented and are instead converted to zero.
 func New[N Number](value N) Decimal {
-	var d Decimal
 	switch v := any(value).(type) {
 	case uint:
-		d.Integer = uint64(v)
+		return Decimal{
+			Integer: uint64(v),
+		}
 	case uint8:
-		d.Integer = uint64(v)
+		return Decimal{
+			Integer: uint64(v),
+		}
 	case uint16:
-		d.Integer = uint64(v)
+		return Decimal{
+			Integer: uint64(v),
+		}
 	case uint32:
-		d.Integer = uint64(v)
+		return Decimal{
+			Integer: uint64(v),
+		}
 	case uint64:
-		d.Integer = v
+		return Decimal{
+			Integer: uint64(v),
+		}
 	case int:
+		var d Decimal
 		i := int64(v)
 		if i < 0 {
 			d.Negative = true
 			i = -i
 		}
 		d.Integer = uint64(i)
+		return d
 	case int8:
+		var d Decimal
 		i := int64(v)
 		if i < 0 {
 			d.Negative = true
 			i = -i
 		}
 		d.Integer = uint64(i)
+		return d
 	case int16:
+		var d Decimal
 		i := int64(v)
 		if i < 0 {
 			d.Negative = true
 			i = -i
 		}
 		d.Integer = uint64(i)
+		return d
 	case int32:
+		var d Decimal
 		i := int64(v)
 		if i < 0 {
 			d.Negative = true
 			i = -i
 		}
 		d.Integer = uint64(i)
+		return d
 	case int64:
+		var d Decimal
 		if v < 0 {
 			d.Negative = true
 			v = -v
 		}
 		d.Integer = uint64(v)
+		return d
 	case float32:
+		var d Decimal
 		if math.IsInf(float64(v), 0) || math.IsNaN(float64(v)) {
 			return Zero()
 		}
@@ -76,7 +96,9 @@ func New[N Number](value N) Decimal {
 		d.Fraction = uint64((v - float32(d.Integer)) * float32(pow10[10]))
 		d.Digits = 10
 		d = d.Truncate()
+		return d
 	case float64:
+		var d Decimal
 		if math.IsInf(v, 0) || math.IsNaN(v) {
 			return Zero()
 		}
@@ -88,8 +110,12 @@ func New[N Number](value N) Decimal {
 		d.Fraction = uint64((v - float64(d.Integer)) * float64(pow10[18]))
 		d.Digits = 18
 		d = d.Truncate()
+		return d
+	case Decimal:
+		return v
+	default:
+		panic("unsupported type: generics failed")
 	}
-	return d
 }
 
 // Zero returns a zero value decimal

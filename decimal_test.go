@@ -181,22 +181,79 @@ func TestNew(t *testing.T) {
 	}
 }
 
-func BenchmarkDecimal_NewFloat32(b *testing.B) {
-	for b.Loop() {
-		_ = decimal.New(float32(123.456))
-	}
-}
-
-func BenchmarkDecimal_NewFloat64(b *testing.B) {
-	for b.Loop() {
-		_ = decimal.New(123.456)
-	}
-}
-
-func BenchmarkDecimal_NewInt(b *testing.B) {
-	for b.Loop() {
-		_ = decimal.New(123456)
-	}
+func BenchmarkNew(b *testing.B) {
+	b.Run("uint", func(b *testing.B) {
+		var v uint = 123
+		for b.Loop() {
+			_ = decimal.New(v)
+		}
+	})
+	b.Run("uint8", func(b *testing.B) {
+		var v uint8 = 123
+		for b.Loop() {
+			_ = decimal.New(v)
+		}
+	})
+	b.Run("uint16", func(b *testing.B) {
+		var v uint16 = 123
+		for b.Loop() {
+			_ = decimal.New(v)
+		}
+	})
+	b.Run("uint32", func(b *testing.B) {
+		var v uint32 = 123
+		for b.Loop() {
+			_ = decimal.New(v)
+		}
+	})
+	b.Run("uint64", func(b *testing.B) {
+		var v uint64 = 123
+		for b.Loop() {
+			_ = decimal.New(v)
+		}
+	})
+	b.Run("int", func(b *testing.B) {
+		var v int = -123
+		for b.Loop() {
+			_ = decimal.New(v)
+		}
+	})
+	b.Run("int8", func(b *testing.B) {
+		var v int8 = -123
+		for b.Loop() {
+			_ = decimal.New(v)
+		}
+	})
+	b.Run("int16", func(b *testing.B) {
+		var v int16 = -123
+		for b.Loop() {
+			_ = decimal.New(v)
+		}
+	})
+	b.Run("int32", func(b *testing.B) {
+		var v int32 = -123
+		for b.Loop() {
+			_ = decimal.New(v)
+		}
+	})
+	b.Run("int64", func(b *testing.B) {
+		var v int64 = -123
+		for b.Loop() {
+			_ = decimal.New(v)
+		}
+	})
+	b.Run("float32", func(b *testing.B) {
+		var v float32 = -123.456
+		for b.Loop() {
+			_ = decimal.New(v)
+		}
+	})
+	b.Run("float64", func(b *testing.B) {
+		var v float64 = -123.456
+		for b.Loop() {
+			_ = decimal.New(v)
+		}
+	})
 }
 
 func TestDecimal_ToDigits(t *testing.T) {
