@@ -125,6 +125,9 @@ func TestDecimal_NewFromStringFuzzy(t *testing.T) {
 		{"no_digits", "abc", decimal.Decimal{}, true},
 		{"integer_overflow", "$123456789012345678901.00", decimal.Decimal{}, true},
 		{"fraction_overflow", "$0.123456789012345678901", decimal.Decimal{}, true},
+		{"negative_zero", "-0", decimal.Decimal{}, false},
+		{"bare_minus", "-", decimal.Decimal{}, true},
+		{"bare_dot", ".", decimal.Decimal{}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
