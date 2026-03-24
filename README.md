@@ -164,12 +164,14 @@ Conversion of numeric types uses the least amount of fractional digits possible 
 
 Arithmetic operations extend precision as necessary to represent the resulting value exactly unless it overflows the limits.
 
-To adjust precision manually, there are two options:
+To adjust precision manually, there are three options:
 
 - `ToDigits(uint8) Decimal`
+- `Round(uint8) Decimal`
 - `Truncate() Decimal`
 
 `ToDigits` extends precision by adding trailing zeros, or reduces precision by truncation. It truncates toward zero and does not round.
+`Round` extends precision by adding trailing zeros, or reduces precision by rounding to nearest, ties away from zero.
 `Truncate` removes unnecessary trailing zeros while ensuring to never change the value.
 
 Example:
@@ -177,7 +179,8 @@ Example:
 ```go
 d, _ := decimal.NewFromString("1.999")
 
-fmt.Println(d.ToDigits(2).String()) // 1.99
+d.ToDigits(2) // 1.99
+d.Round(2)    // 2.00
 ```
 
 ## Formatting And Conversion

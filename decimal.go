@@ -147,12 +147,39 @@ func (d Decimal) ToDigits(digits uint8) Decimal {
 	if digits > 19 {
 		digits = 19
 	}
-	for ; d.Digits < digits; d.Digits++ {
-		d.Fraction *= 10
+	if digits > d.Digits {
+		d.Fraction *= pow10[digits-d.Digits]
+	} else if digits < d.Digits {
+		d.Fraction /= pow10[d.Digits-digits]
 	}
-	for ; d.Digits > digits; d.Digits-- {
-		d.Fraction /= 10
+	d.Digits = digits
+	if d.Integer == 0 && d.Fraction == 0 {
+		d.Negative = false
 	}
+	return d
+}
+
+// Round rounds a decimal value to the specified number of digits after the decimal point.
+// It rounds to nearest, ties away from zero.
+// The number of digits is limited to 19.
+func (d Decimal) Round(digits uint8) Decimal {
+	if digits > 19 {
+		digits = 19
+	}
+	if digits > d.Digits {
+		d.Fraction *= pow10[digits-d.Digits]
+	} else if digits < d.Digits {
+		d.Fraction /= pow10[d.Digits-digits-1]
+		var rem uint64
+		d.Fraction, rem = bits.Div64(0, d.Fraction, 10)
+		if rem >= 5 {
+			d.Fraction++
+			var carry uint64
+			carry, d.Fraction = bits.Div64(0, d.Fraction, pow10[digits])
+			d.Integer += carry
+		}
+	}
+	d.Digits = digits
 	if d.Integer == 0 && d.Fraction == 0 {
 		d.Negative = false
 	}

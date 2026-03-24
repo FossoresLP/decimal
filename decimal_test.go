@@ -157,6 +157,66 @@ func TestDecimal_ToDigits(t *testing.T) {
 	}
 }
 
+func BenchmarkDecimal_ToDigits(b *testing.B) {
+	var d decimal.Decimal
+	for b.Loop() {
+		_ = d.ToDigits(12)
+	}
+}
+
+func TestDecimal_Round(t *testing.T) {
+	tests := []struct {
+		name   string
+		d      decimal.Decimal
+		digits uint8
+		want   decimal.Decimal
+	}{
+		// No-op: same digits
+		{"same_digits", decimal.Decimal{Integer: 1, Fraction: 456, Digits: 3}, 3, decimal.Decimal{Integer: 1, Fraction: 456, Digits: 3}},
+		// Expand: fewer digits to more
+		{"expand", decimal.Decimal{Fraction: 12, Digits: 2}, 5, decimal.Decimal{Fraction: 12000, Digits: 5}},
+		{"expand_zero", decimal.Decimal{}, 3, decimal.Decimal{Digits: 3}},
+		{"expand_integer", decimal.Decimal{Integer: 42}, 2, decimal.Decimal{Integer: 42, Digits: 2}},
+		// Round down (remainder < 5)
+		{"round_down", decimal.Decimal{Integer: 1, Fraction: 1234, Digits: 4}, 2, decimal.Decimal{Integer: 1, Fraction: 12, Digits: 2}},
+		{"round_down_zero_rem", decimal.Decimal{Fraction: 100, Digits: 3}, 1, decimal.Decimal{Fraction: 1, Digits: 1}},
+		// Round up (remainder >= 5)
+		{"round_up", decimal.Decimal{Integer: 1, Fraction: 456, Digits: 3}, 2, decimal.Decimal{Integer: 1, Fraction: 46, Digits: 2}},
+		{"round_up_5", decimal.Decimal{Fraction: 15, Digits: 2}, 1, decimal.Decimal{Fraction: 2, Digits: 1}},
+		{"round_up_carry_fraction_only", decimal.Decimal{Fraction: 99, Digits: 2}, 1, decimal.Decimal{Integer: 1, Digits: 1}},
+		{"round_up_carry_integer", decimal.Decimal{Integer: 1, Fraction: 999, Digits: 3}, 2, decimal.Decimal{Integer: 2, Digits: 2}},
+		{"round_up_carry_negative", decimal.Decimal{Integer: 1, Fraction: 999, Digits: 3, Negative: true}, 2, decimal.Decimal{Integer: 2, Digits: 2, Negative: true}},
+		// Round to zero digits
+		{"round_to_zero_down", decimal.Decimal{Integer: 5, Fraction: 4, Digits: 1}, 0, decimal.Decimal{Integer: 5}},
+		{"round_to_zero_up", decimal.Decimal{Integer: 5, Fraction: 5, Digits: 1}, 0, decimal.Decimal{Integer: 6}},
+		// Negative values
+		{"negative_round_down", decimal.Decimal{Integer: 1, Fraction: 1234, Digits: 4, Negative: true}, 2, decimal.Decimal{Integer: 1, Fraction: 12, Digits: 2, Negative: true}},
+		{"negative_round_up", decimal.Decimal{Integer: 1, Fraction: 456, Digits: 3, Negative: true}, 2, decimal.Decimal{Integer: 1, Fraction: 46, Digits: 2, Negative: true}},
+		// Negative to zero clears sign
+		{"negative_to_zero", decimal.Decimal{Fraction: 4, Digits: 1, Negative: true}, 0, decimal.Decimal{}},
+		// Clamp digits > 19
+		{"clamp_out_of_range", decimal.Decimal{Integer: 1}, 48, decimal.Decimal{Integer: 1, Digits: 19}},
+		// High precision
+		{"high_precision_round", decimal.Decimal{Integer: 3, Fraction: 1415926535897932384, Digits: 19}, 4, decimal.Decimal{Integer: 3, Fraction: 1416, Digits: 4}},
+		{"high_precision_round_carry", decimal.Decimal{Fraction: 9999999999999999999, Digits: 19}, 18, decimal.Decimal{Integer: 1, Digits: 18}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.d.Round(tt.digits)
+			if !decimal.Equal(tt.want, result) {
+				t.Errorf("Decimal.Round() = %v, want %v", result, tt.want)
+			}
+		})
+	}
+}
+
+func BenchmarkDecimal_Round(b *testing.B) {
+	d := decimal.Decimal{Integer: 1, Fraction: 99999, Digits: 5}
+	for b.Loop() {
+		_ = d.Round(2)
+	}
+}
+
 func TestDecimal_Zero(t *testing.T) {
 	zero := decimal.Decimal{}
 	if !decimal.Equal(zero, decimal.Zero()) {
