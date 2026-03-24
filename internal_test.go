@@ -2,11 +2,18 @@ package decimal
 
 import "testing"
 
+func BenchmarkFull(b *testing.B) {
+	d := Decimal{}
+	for b.Loop() {
+		_ = d.full()
+	}
+}
+
 func TestDiv128(t *testing.T) {
 	tests := []struct {
-		name                   string
-		numHi, numLo           uint64
-		denHi, denLo           uint64
+		name                    string
+		numHi, numLo            uint64
+		denHi, denLo            uint64
 		wantQ, wantRHi, wantRLo uint64
 	}{
 		{"den_hi_zero_num_hi_lt_den_lo", 1, 0, 0, 3, 6148914691236517205, 0, 1},

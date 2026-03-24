@@ -53,9 +53,9 @@ func main() {
 	sum := decimal.Add(a, b)
 	expected, _ := decimal.NewFromString("125.45")
 
-	fmt.Println(a.String())          // 123.4500
-	fmt.Println(sum.String())        // 125.4500
-	fmt.Println(sum.Equal(expected)) // true
+	fmt.Println(a.String())   // 123.4500
+	fmt.Println(sum.String()) // 125.4500
+	fmt.Println(decimal.Equal(sum, expected)) // true
 }
 ```
 
@@ -131,7 +131,7 @@ Operations that require more than 19 digits after the decimal point may lose pre
 
 All arithmetic operations accept `Decimal` values as well as any of the primitive Go numeric types, converting to `Decimal` as described by `New`.
 
-## Equality
+## Equality / Comparison
 
 `Equal` compares values after canonical trailing-zero truncation.
 
@@ -140,7 +140,21 @@ These compare equal:
 ```go
 a, _ := decimal.NewFromString("0.1")
 b, _ := decimal.NewFromString("0.10")
-a.Equal(b) // true
+decimal.Equal(a, b) // true
+```
+
+`Compare` compares to values and returns `-1` if `a < b`, `0` if `a = b` and 1 if `a > b`.
+
+```go
+a := decimal.New(1)
+b := decimal.New(-2)
+decimal.Compare(a, b) // 1
+```
+
+`IsZero` checks if a decimal is exactly zero.
+
+```go
+decimal.New(0).IsZero() // true
 ```
 
 ## Precision

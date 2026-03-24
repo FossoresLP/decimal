@@ -67,7 +67,7 @@ func TestDecimal_NewFloat(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			if got := decimal.New(tt.f); !tt.want.Equal(got) {
+			if got := decimal.New(tt.f); !decimal.Equal(tt.want, got) {
 				t.Errorf("Decimal.FromFloat64() = %#v, want %#v", got, tt.want)
 			}
 		})

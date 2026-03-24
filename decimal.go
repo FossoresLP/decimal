@@ -135,17 +135,9 @@ type Decimal struct {
 	Fraction uint64
 }
 
-// Equal checks if 2 decimal values are equal by value.
-// Values with different numbers of decimal digits are considered equal when their exact representations with the least possible number of digits behind the decimal point are equal.
-func (d Decimal) Equal(d2 Decimal) bool {
-	a := d.Truncate()
-	b := d2.Truncate()
-	return a.Negative == b.Negative && a.Integer == b.Integer && a.Fraction == b.Fraction && a.Digits == b.Digits
-}
-
-// IsZero checks if a decimal value is zero.
-func (d Decimal) IsZero() bool {
-	return d.Integer == 0 && d.Fraction == 0
+func (d Decimal) full() Decimal {
+	d.Fraction *= pow10[19-d.Digits]
+	return d
 }
 
 // ToDigits converts a decimal value to the specified number of digits after the decimal point.

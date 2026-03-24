@@ -58,7 +58,7 @@ func TestDecimal_NewFromString(t *testing.T) {
 			if err != nil && !tt.wantErr {
 				t.Errorf("Decimal.NewString() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if !tt.want.Equal(got) {
+			if !decimal.Equal(tt.want, got) {
 				t.Errorf("Decimal.NewString() = %v, want %v", got, tt.want)
 			}
 		})
@@ -135,7 +135,7 @@ func TestDecimal_NewFromStringFuzzy(t *testing.T) {
 			if err != nil && !tt.wantErr {
 				t.Errorf("Decimal.NewString() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if !tt.want.Equal(got) {
+			if !decimal.Equal(tt.want, got) {
 				t.Errorf("Decimal.NewString() = %v, want %v", got, tt.want)
 			}
 		})
@@ -303,7 +303,7 @@ func TestDecimal_UnmarshalText(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("UnmarshalText() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if !tt.wantErr && !d.Equal(tt.want) {
+			if !tt.wantErr && !decimal.Equal(d, tt.want) {
 				t.Errorf("UnmarshalText() = %v, want %v", d, tt.want)
 			}
 		})
