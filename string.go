@@ -2,6 +2,7 @@ package decimal
 
 import (
 	"fmt"
+	"io"
 	"unsafe"
 )
 
@@ -176,6 +177,98 @@ func (d Decimal) String() string {
 		pos++
 	}
 	return string(arr[pos:])
+}
+
+// Format implements fmt.Formatter.
+// It supports "%f" and "%v" but not the other formats specified for floating point values such as "%e".
+func (d Decimal) Format(state fmt.State, verb rune) {
+	pad := func(char byte, count int) {
+		if count <= 0 {
+			return
+		}
+		buf := [64]byte{}
+		for i := range buf {
+			buf[i] = char
+		}
+		for count > 0 {
+			chunk := min(count, len(buf))
+			state.Write(buf[:chunk])
+			count -= chunk
+		}
+	}
+
+	switch verb {
+	case 'f':
+		trail := 0
+		if precision, ok := state.Precision(); ok {
+			d = d.Round(uint8(max(0, min(precision, 19))))
+			if precision > int(d.Digits) {
+				trail = min(precision, 1024) - int(d.Digits)
+			}
+		} else {
+			d = d.Round(6)
+		}
+		width, fixedWidth := state.Width()
+		width = min(width, 1024)
+		sign := ""
+		if d.Negative {
+			sign = "-"
+		} else if state.Flag('+') {
+			sign = "+"
+		} else if state.Flag(' ') {
+			sign = " "
+		}
+		d.Negative = false
+		str := d.String()
+		if d.Digits == 0 && state.Flag('#') {
+			str = str + "."
+		}
+		length := len(sign) + len(str) + trail
+		if !fixedWidth {
+			io.WriteString(state, sign)
+			io.WriteString(state, str)
+			pad('0', trail)
+			return
+		}
+		if state.Flag('-') {
+			io.WriteString(state, sign)
+			io.WriteString(state, str)
+			pad('0', trail)
+			pad(' ', width-length)
+			return
+		}
+		if state.Flag('0') {
+			io.WriteString(state, sign)
+			pad('0', width-length)
+			io.WriteString(state, str)
+			pad('0', trail)
+			return
+		}
+		pad(' ', width-length)
+		io.WriteString(state, sign)
+		io.WriteString(state, str)
+		pad('0', trail)
+	case 'v':
+		// %v handles only padding via state.Width() and state.Flag('-') and debug formatting via state.Flag('#').
+		// Other flags are intentially ignored since even the standard library has an inconsistent approach for those.
+		width, fixedWidth := state.Width()
+		left := state.Flag('-')
+
+		str := d.String()
+		if state.Flag('#') {
+			str = fmt.Sprintf("decimal.Decimal{Negative: %t, Integer: %d, Fraction: %d, Digits: %d}", d.Negative, d.Integer, d.Fraction, d.Digits)
+		}
+
+		if fixedWidth && !left {
+			pad(' ', width-len(str))
+		}
+		io.WriteString(state, str)
+		if fixedWidth && left {
+			pad(' ', width-len(str))
+		}
+	default:
+		fmt.Fprintf(state, "%%!%c(decimal.Decimal=%s)", verb, d.String())
+	}
 }
 
 // MarshalText implements encoding.TextMarshaler.

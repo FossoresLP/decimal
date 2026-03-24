@@ -3,6 +3,7 @@ package decimal_test
 import (
 	"encoding"
 	"encoding/xml"
+	"fmt"
 	"testing"
 
 	"github.com/fossoreslp/decimal"
@@ -13,6 +14,8 @@ var (
 	_ encoding.TextMarshaler   = decimal.Decimal{}
 	_ encoding.TextUnmarshaler = (*decimal.Decimal)(nil)
 )
+
+var benchmarkFormatSink string
 
 func TestDecimal_NewFromString(t *testing.T) {
 	tests := []struct {
@@ -238,6 +241,204 @@ func BenchmarkDecimal_String(b *testing.B) {
 		b.Run(bb.name, func(b *testing.B) {
 			for b.Loop() {
 				_ = bb.d.String()
+			}
+		})
+	}
+}
+
+func TestDecimal_FormatF(t *testing.T) {
+	tests := []struct {
+		name   string
+		format string
+		d      decimal.Decimal
+		want   string
+	}{
+		{
+			name:   "default_precision_rounds_to_six_digits",
+			format: "%f",
+			d:      decimal.Decimal{Integer: 12, Fraction: 3456789, Digits: 7},
+			want:   "12.345679",
+		},
+		{
+			name:   "explicit_precision_rounds",
+			format: "%.2f",
+			d:      decimal.Decimal{Integer: 1, Fraction: 235, Digits: 3},
+			want:   "1.24",
+		},
+		{
+			name:   "explicit_precision_adds_trailing_zeros",
+			format: "%.4f",
+			d:      decimal.Decimal{Integer: 12, Fraction: 3, Digits: 1},
+			want:   "12.3000",
+		},
+		{
+			name:   "zero_precision_omits_decimal_point",
+			format: "%.0f",
+			d:      decimal.Decimal{Integer: 12, Fraction: 6, Digits: 1},
+			want:   "13",
+		},
+		{
+			name:   "alternate_zero_precision_keeps_decimal_point",
+			format: "%#.0f",
+			d:      decimal.Decimal{Integer: 12},
+			want:   "12.",
+		},
+		{
+			name:   "plus_flag_for_positive",
+			format: "%+.2f",
+			d:      decimal.Decimal{Integer: 1, Fraction: 2, Digits: 1},
+			want:   "+1.20",
+		},
+		{
+			name:   "space_flag_for_positive",
+			format: "% .2f",
+			d:      decimal.Decimal{Integer: 1, Fraction: 2, Digits: 1},
+			want:   " 1.20",
+		},
+		{
+			name:   "negative_zero_padding",
+			format: "%08.2f",
+			d:      decimal.Decimal{Negative: true, Integer: 1, Fraction: 2, Digits: 1},
+			want:   "-0001.20",
+		},
+		{
+			name:   "left_aligned_width",
+			format: "%-8.2f",
+			d:      decimal.Decimal{Integer: 1, Fraction: 2, Digits: 1},
+			want:   "1.20    ",
+		},
+		{
+			name:   "precision_beyond_internal_limit_gets_zero_extended",
+			format: "%.25f",
+			d:      decimal.Decimal{Integer: 1, Fraction: 2, Digits: 1},
+			want:   "1.2000000000000000000000000",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := fmt.Sprintf(tt.format, tt.d); got != tt.want {
+				t.Errorf("fmt.Sprintf(%q, %#v) = %q, want %q", tt.format, tt.d, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDecimal_FormatV(t *testing.T) {
+	debug := "decimal.Decimal{Negative: true, Integer: 12, Fraction: 34, Digits: 2}"
+	tests := []struct {
+		name   string
+		format string
+		d      decimal.Decimal
+		want   string
+	}{
+		{
+			name:   "plain_v_uses_decimal_string",
+			format: "%v",
+			d:      decimal.Decimal{Negative: true, Integer: 12, Fraction: 34, Digits: 2},
+			want:   "-12.34",
+		},
+		{
+			name:   "plain_v_right_aligns",
+			format: "%8v",
+			d:      decimal.Decimal{Integer: 12, Fraction: 34, Digits: 2},
+			want:   "   12.34",
+		},
+		{
+			name:   "plain_v_left_aligns",
+			format: "%-8v",
+			d:      decimal.Decimal{Integer: 12, Fraction: 34, Digits: 2},
+			want:   "12.34   ",
+		},
+		{
+			name:   "debug_v_uses_custom_go_syntax",
+			format: "%#v",
+			d:      decimal.Decimal{Negative: true, Integer: 12, Fraction: 34, Digits: 2},
+			want:   debug,
+		},
+		{
+			name:   "debug_v_right_aligns",
+			format: "%#80v",
+			d:      decimal.Decimal{Negative: true, Integer: 12, Fraction: 34, Digits: 2},
+			want:   fmt.Sprintf("%80s", debug),
+		},
+		{
+			name:   "debug_v_left_aligns",
+			format: "%-#80v",
+			d:      decimal.Decimal{Negative: true, Integer: 12, Fraction: 34, Digits: 2},
+			want:   fmt.Sprintf("%-80s", debug),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := fmt.Sprintf(tt.format, tt.d); got != tt.want {
+				t.Errorf("fmt.Sprintf(%q, %#v) = %q, want %q", tt.format, tt.d, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDecimal_FormatUnsupportedVerb(t *testing.T) {
+	d := decimal.Decimal{Integer: 12, Fraction: 34, Digits: 2}
+	want := "%!d(decimal.Decimal=12.34)"
+	if got := fmt.Sprintf("%d", d); got != want {
+		t.Errorf("fmt.Sprintf(\"%%d\", %#v) = %q, want %q", d, got, want)
+	}
+}
+
+func BenchmarkDecimal_Format(b *testing.B) {
+	benchmarks := []struct {
+		name   string
+		format string
+		d      decimal.Decimal
+	}{
+		{
+			name:   "f_default_precision",
+			format: "%f",
+			d:      decimal.Decimal{Integer: 12, Fraction: 3456789, Digits: 7},
+		},
+		{
+			name:   "f_round_and_extend",
+			format: "%.8f",
+			d:      decimal.Decimal{Integer: 12, Fraction: 3, Digits: 1},
+		},
+		{
+			name:   "f_width_zero_pad_negative",
+			format: "%012.2f",
+			d:      decimal.Decimal{Negative: true, Integer: 12, Fraction: 34, Digits: 2},
+		},
+		{
+			name:   "f_alternate_zero_precision",
+			format: "%#.0f",
+			d:      decimal.Decimal{Integer: 12},
+		},
+		{
+			name:   "v_plain",
+			format: "%v",
+			d:      decimal.Decimal{Negative: true, Integer: 12, Fraction: 34, Digits: 2},
+		},
+		{
+			name:   "v_width",
+			format: "%12v",
+			d:      decimal.Decimal{Integer: 12, Fraction: 34, Digits: 2},
+		},
+		{
+			name:   "v_debug",
+			format: "%#v",
+			d:      decimal.Decimal{Negative: true, Integer: 12, Fraction: 34, Digits: 2},
+		},
+		{
+			name:   "v_debug_width",
+			format: "%#80v",
+			d:      decimal.Decimal{Negative: true, Integer: 12, Fraction: 34, Digits: 2},
+		},
+	}
+
+	for _, bb := range benchmarks {
+		b.Run(bb.name, func(b *testing.B) {
+			for b.Loop() {
+				benchmarkFormatSink = fmt.Sprintf(bb.format, bb.d)
 			}
 		})
 	}
