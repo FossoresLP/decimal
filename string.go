@@ -148,34 +148,41 @@ fracloop:
 	return d, nil
 }
 
-// String converts a decimal value into a string representation.
-func (d Decimal) String() string {
-	arr := [48]byte{} // 1 digit sign, 20 digits integer, 1 dot, 20 digits fraction, aligned to 64-bit
-	pos := 47
+// internal helper for text conversion.
+// 1 digit sign, 20 digits integer, 1 dot, 20 digits fraction, aligned to 64-bit
+func (d Decimal) text(arr *[48]byte) int {
+	pos := 48
 	if d.Digits > 0 {
-		frac := d.Fraction
-		end := 47 - int(d.Digits)
-		for ; pos > end; pos-- {
-			arr[pos] = byte(frac%10) + '0'
-			frac /= 10
-		}
-		arr[pos] = '.'
-		pos--
-	}
-	if d.Integer == 0 {
-		arr[pos] = '0'
-		pos--
-	} else {
-		for n := d.Integer; n > 0; n /= 10 {
-			arr[pos] = byte(n%10) + '0'
+		for ; d.Fraction > 0; d.Fraction /= 10 {
 			pos--
+			arr[pos] = byte(d.Fraction%10) + '0'
 		}
+		frac := 48 - int(d.Digits)
+		for pos > frac {
+			pos--
+			arr[pos] = '0'
+		}
+		pos--
+		arr[pos] = '.'
+	}
+	pos--
+	arr[pos] = byte(d.Integer%10) + '0'
+	d.Integer /= 10
+	for ; d.Integer > 0; d.Integer /= 10 {
+		pos--
+		arr[pos] = byte(d.Integer%10) + '0'
 	}
 	if d.Negative {
+		pos--
 		arr[pos] = '-'
-	} else {
-		pos++
 	}
+	return pos
+}
+
+// String converts a decimal value into a string representation.
+func (d Decimal) String() string {
+	var arr [48]byte
+	pos := d.text(&arr)
 	return string(arr[pos:])
 }
 
@@ -273,7 +280,11 @@ func (d Decimal) Format(state fmt.State, verb rune) {
 
 // MarshalText implements encoding.TextMarshaler.
 func (d Decimal) MarshalText() ([]byte, error) {
-	return d.MarshalJSON()
+	var arr [48]byte
+	pos := d.text(&arr)
+	b := make([]byte, 48-pos)
+	copy(b, arr[pos:])
+	return b, nil
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.

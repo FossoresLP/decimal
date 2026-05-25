@@ -4,35 +4,11 @@ import "unsafe"
 
 // MarshalJSON encodes a decimal value as a JSON number.
 func (d Decimal) MarshalJSON() ([]byte, error) {
-	buf := [48]byte{} // need 48 bytes, 1 digit sign, 20 digits integer, 1 dot, 20 digits fraction, aligned to 64-bit
-	pos := 47
-	if d.Digits > 0 {
-		frac := d.Fraction
-		end := 47 - int(d.Digits)
-		for ; pos > end; pos-- {
-			buf[pos] = byte(frac%10) + '0'
-			frac /= 10
-		}
-		buf[pos] = '.'
-		pos--
-	}
-	if d.Integer == 0 {
-		buf[pos] = '0'
-		pos--
-	} else {
-		for n := d.Integer; n > 0; n /= 10 {
-			buf[pos] = byte(n%10) + '0'
-			pos--
-		}
-	}
-	if d.Negative {
-		buf[pos] = '-'
-	} else {
-		pos++
-	}
-	out := make([]byte, 48-pos)
-	copy(out, buf[pos:])
-	return out, nil
+	var arr [48]byte
+	pos := d.text(&arr)
+	b := make([]byte, 48-pos)
+	copy(b, arr[pos:])
+	return b, nil
 }
 
 // UnmarshalJSON decodes a JSON number or string into a decimal value.

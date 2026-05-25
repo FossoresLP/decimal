@@ -10,11 +10,9 @@ import (
 
 // MarshalJSONTo implements encoding/json/v2.MarshalerTo.
 func (d Decimal) MarshalJSONTo(enc *jsontext.Encoder) error {
-	val, err := d.MarshalJSON()
-	if err != nil {
-		return err
-	}
-	return enc.WriteValue(val)
+	var arr [48]byte
+	pos := d.text(&arr)
+	return enc.WriteValue(arr[pos:])
 }
 
 // UnmarshalJSONFrom implements encoding/json/v2.UnmarshalerFrom.
