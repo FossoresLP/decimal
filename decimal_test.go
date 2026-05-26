@@ -45,6 +45,9 @@ func TestNew(t *testing.T) {
 		{"float64_negative_subnormal", decimal.New(-5e-324), decimal.Decimal{}},
 		{"float64_negative_tiny", decimal.New(-1e-19), decimal.Decimal{}},
 		{"float32_negative_tiny", decimal.New(float32(-1e-20)), decimal.Decimal{}},
+		// Fixed
+		{"fixed", decimal.New(decimal.Fixed(12345)), decimal.Decimal{Integer: 123, Fraction: 45, Digits: 2}},
+		{"fixed_negative", decimal.New(decimal.Fixed(-12345)), decimal.Decimal{Integer: 123, Fraction: 45, Digits: 2, Negative: true}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

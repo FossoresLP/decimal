@@ -39,3 +39,35 @@ func (d *Decimal) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		return fmt.Errorf("decimal: unsupported JSON kind: %v", val.Kind())
 	}
 }
+
+// MarshalJSONTo implements encoding/json/v2.MarshalerTo.
+func (f Fixed) MarshalJSONTo(enc *jsontext.Encoder) error {
+	var arr [16]byte
+	pos := f.text(&arr)
+	return enc.WriteValue(arr[pos:])
+}
+
+// UnmarshalJSONFrom implements encoding/json/v2.UnmarshalerFrom.
+func (f *Fixed) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	val, err := dec.ReadValue()
+	if err != nil {
+		return err
+	}
+	switch val.Kind() {
+	case jsontext.KindNull:
+		*f = 0
+		return nil
+	case jsontext.KindString:
+		val = val[1 : len(val)-1] // strip quotes
+		fallthrough
+	case jsontext.KindNumber:
+		parsed, err := NewFixedFromString(unsafe.String(unsafe.SliceData(val), len(val)))
+		if err != nil {
+			return err
+		}
+		*f = parsed
+		return nil
+	default:
+		return fmt.Errorf("decimal: unsupported JSON kind: %v", val.Kind())
+	}
+}

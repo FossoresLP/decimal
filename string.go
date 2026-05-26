@@ -3,6 +3,7 @@ package decimal
 import (
 	"fmt"
 	"io"
+	"math"
 	"unsafe"
 )
 
@@ -294,5 +295,132 @@ func (d *Decimal) UnmarshalText(data []byte) error {
 		return err
 	}
 	*d = val
+	return nil
+}
+
+// NewFixedFromString parses a fixed-point value from a string.
+// The string must contain just the number with no additional characters around it.
+// Fractional digits that cannot be represented are rejected.
+// Strings with more than 16 characters plus optional sign are rejected outright.
+// The value must fit in the range [-21474836.48, 21474836.47].
+func NewFixedFromString(s string) (Fixed, error) {
+	if len(s) == 0 {
+		return 0, fmt.Errorf("no number in string: %s", s)
+	}
+	var sign Fixed = 1
+	if s[0] == '-' {
+		sign = -1
+		s = s[1:]
+	}
+	if len(s) == 0 {
+		return 0, fmt.Errorf("no number in string: %s", s)
+	}
+	if len(s) > 16 {
+		return 0, fmt.Errorf("value too long to be processed as fixed decimal: %s", s)
+	}
+	var val uint64 = 0
+	var hasFrac bool = false
+	for i := range s {
+		if c := s[i] - '0'; c <= 9 {
+			val = val*10 + uint64(c)
+		} else if s[i] == '.' {
+			if i == 0 && len(s) == 1 {
+				return 0, fmt.Errorf("no number in string: %s", s)
+			}
+			hasFrac = true
+			s = s[i+1:]
+			break
+		} else {
+			return 0, fmt.Errorf("invalid character in integer: %c", s[i])
+		}
+	}
+	val *= 100
+	if !hasFrac {
+		if val > math.MaxInt32 {
+			return 0, fmt.Errorf("value overflows fixed decimal: %d", val)
+		}
+		return sign * Fixed(val), nil
+	}
+	var f1, f2 uint64
+	if len(s) > 0 {
+		f1 = uint64(s[0] - '0')
+		if f1 > 9 {
+			return 0, fmt.Errorf("invalid character in fraction: %c", s[0])
+		}
+	}
+	if len(s) > 1 {
+		f2 = uint64(s[1] - '0')
+		if f2 > 9 {
+			return 0, fmt.Errorf("invalid character in fraction: %c", s[1])
+		}
+	}
+	if len(s) > 2 {
+		for i := range s[2:] {
+			if s[i+2] != '0' {
+				return 0, fmt.Errorf("invalid character in fraction overflow: %c", s[i+2])
+			}
+		}
+	}
+	val += f1*10 + f2
+
+	if val > math.MaxInt32 {
+		if sign < 0 && val == math.MaxInt32+1 {
+			return Fixed(math.MinInt32), nil
+		}
+		return 0, fmt.Errorf("value overflows fixed decimal: %d", val)
+	}
+	return sign * Fixed(val), nil
+}
+
+// internal helper for text conversion.
+// 1 digit sign, 8 digits integer, 1 dot, 2 digits fraction, aligned to 64-bit
+func (f Fixed) text(arr *[16]byte) int {
+	val := int64(f)
+	neg := val < 0
+	if neg {
+		val = -val
+	}
+	arr[15] = byte(val%10) + '0'
+	val /= 10
+	arr[14] = byte(val%10) + '0'
+	val /= 10
+	arr[13] = '.'
+	arr[12] = byte(val%10) + '0'
+	val /= 10
+	pos := 12
+	for ; val > 0; val /= 10 {
+		pos--
+		arr[pos] = byte(val%10) + '0'
+	}
+	if neg {
+		pos--
+		arr[pos] = '-'
+	}
+	return pos
+}
+
+// String converts a fixed-point decimal value into a string representation.
+func (f Fixed) String() string {
+	var arr [16]byte
+	pos := f.text(&arr)
+	return string(arr[pos:])
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (f Fixed) MarshalText() ([]byte, error) {
+	var arr [16]byte
+	pos := f.text(&arr)
+	b := make([]byte, 16-pos)
+	copy(b, arr[pos:])
+	return b, nil
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (f *Fixed) UnmarshalText(data []byte) error {
+	val, err := NewFixedFromString(unsafe.String(unsafe.SliceData(data), len(data)))
+	if err != nil {
+		return err
+	}
+	*f = val
 	return nil
 }

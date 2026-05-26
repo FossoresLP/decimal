@@ -9,3 +9,9 @@ func (d Decimal) Float64() float64 {
 	return float64(d.Integer) + float64(d.Fraction)/float64(pow10[d.Digits])
 
 }
+
+// Float64 converts a fixed-point decimal value to floating point.
+// Precision loss is minimized but not all values can be represented exactly.
+func (f Fixed) Float64() float64 {
+	return float64(f) / 100
+}

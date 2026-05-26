@@ -41,3 +41,8 @@ func Compare[A, B Number](a A, b B) int {
 func (d Decimal) IsZero() bool {
 	return d.Integer == 0 && d.Fraction == 0
 }
+
+// IsZero checks if a fixed-point decimal value is zero.
+func (f Fixed) IsZero() bool {
+	return f == 0
+}

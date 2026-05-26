@@ -216,3 +216,105 @@ func BenchmarkDecimal_UnmarshalCBOR(b *testing.B) {
 		_ = result.UnmarshalCBOR(data)
 	}
 }
+
+func TestFixed_MarshalCBOR(t *testing.T) {
+	tests := []struct {
+		name string
+		f    decimal.Fixed
+		hex  string
+	}{
+		{"zero", 0, "c4822100"},
+		{"hundredth", 1, "c4822101"},
+		{"fraction", 5, "c4822105"},
+		{"fraction_full", 99, "c482211863"},
+		{"one", 100, "c482211864"},
+		{"integer", 12300, "c4822119300c"},
+		{"digits", 12345, "c48221193039"},
+		{"max_int32", 2147483647, "c482211a7fffffff"},
+		{"negative_hundredth", -1, "c4822120"},
+		{"negative_fraction", -5, "c4822124"},
+		{"negative_integer", -500, "c482213901f3"},
+		{"negative_digits", -12345, "c48221393038"},
+		{"min_int32", -2147483648, "c482213a7fffffff"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.f.MarshalCBOR()
+			if err != nil {
+				t.Fatalf("MarshalCBOR() error = %v", err)
+			}
+			want := mustCBORHex(t, tt.hex)
+			if string(got) != string(want) {
+				t.Fatalf("MarshalCBOR() = %x, want %x", got, want)
+			}
+		})
+	}
+}
+
+func TestFixed_UnmarshalCBOR(t *testing.T) {
+	tests := []struct {
+		name    string
+		hex     string
+		initial decimal.Fixed
+		want    decimal.Fixed
+		wantErr bool
+	}{
+		// values produced by Fixed.MarshalCBOR
+		{"zero", "c4822100", 12345, 0, false},
+		{"digits", "c48221193039", 0, 12345, false},
+		{"max_int32", "c482211a7fffffff", 0, 2147483647, false},
+		{"negative_digits", "c48221393038", 0, -12345, false},
+		{"min_int32", "c482213a7fffffff", 0, -2147483648, false},
+		// plain CBOR encodings are accepted when representable as Fixed
+		{"plain_integer", "187b", 0, 12300, false},
+		{"plain_negative_integer", "387a", 0, -12300, false},
+		{"float_1_5", "fb3ff8000000000000", 0, 150, false},
+		{"float_negative_1_5", "f9be00", 0, -150, false},
+		{"more_digits", "c482221a0001e0f3", 12345, 12345, true},
+		{"invalid", "1c", 12345, 12345, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.initial
+			err := got.UnmarshalCBOR(mustCBORHex(t, tt.hex))
+			if (err != nil) != tt.wantErr {
+				t.Errorf("UnmarshalCBOR() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("UnmarshalCBOR() = %d, want %d", int32(got), int32(tt.want))
+			}
+		})
+	}
+}
+
+func TestFixed_CBORRoundTrip(t *testing.T) {
+	values := []decimal.Fixed{0, 1, 99, 100, 12345, 2147483647, -1, -500, -12345, -2147483648}
+	for _, v := range values {
+		data, err := v.MarshalCBOR()
+		if err != nil {
+			t.Fatalf("MarshalCBOR(%d) error = %v", int32(v), err)
+		}
+		var got decimal.Fixed
+		if err := got.UnmarshalCBOR(data); err != nil {
+			t.Fatalf("UnmarshalCBOR(%x) error = %v", data, err)
+		}
+		if got != v {
+			t.Errorf("round-trip mismatch: got %d, want %d", int32(got), int32(v))
+		}
+	}
+}
+
+func BenchmarkFixed_MarshalCBOR(b *testing.B) {
+	f := decimal.Fixed(12345)
+	for b.Loop() {
+		_, _ = f.MarshalCBOR()
+	}
+}
+
+func BenchmarkFixed_UnmarshalCBOR(b *testing.B) {
+	data := cborHex("c48221193039")
+	var f decimal.Fixed
+	for b.Loop() {
+		_ = f.UnmarshalCBOR(data)
+	}
+}

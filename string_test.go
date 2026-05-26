@@ -13,6 +13,8 @@ import (
 var (
 	_ encoding.TextMarshaler   = decimal.Decimal{}
 	_ encoding.TextUnmarshaler = (*decimal.Decimal)(nil)
+	_ encoding.TextMarshaler   = decimal.Fixed(0)
+	_ encoding.TextUnmarshaler = (*decimal.Fixed)(nil)
 )
 
 var benchmarkFormatSink string
@@ -582,5 +584,206 @@ func TestDecimal_XML(t *testing.T) {
 	}
 	if got.D != s.D {
 		t.Errorf("xml.Unmarshal() = %#v, want %#v", got.D, s.D)
+	}
+}
+
+func TestNewFixedFromString(t *testing.T) {
+	tests := []struct {
+		name    string
+		s       string
+		want    decimal.Fixed
+		wantErr bool
+	}{
+		{"zero", "0.0", 0, false},
+		{"integer", "123", 12300, false},
+		{"fraction", "0.12", 12, false},
+		{"fraction_truncated", "0.123", 0, true},
+		{"fraction_zeros", "0.1200", 12, false},
+		{"digits", "123.45", 12345, false},
+		{"digits_truncated", "123.456", 0, true},
+		{"digits_zeros", "123.4500", 12345, false},
+		{"negative", "-123.45", -12345, false},
+		{"negative_truncated", "-123.456", 0, true},
+		{"negative_zeroes", "-123.4500", -12345, false},
+		{"half", "1.5", 150, false},
+		{"fraction_only", "0.99", 99, false},
+		{"small_fraction", "100.01", 10001, false},
+		{"leading_dot", ".12", 12, false},
+		{"leading_dot_truncated", ".123", 0, true},
+		{"trailing_dot", "123.", 12300, false},
+		{"negative_integer", "-5", -500, false},
+		{"plain_integer", "42", 4200, false},
+		{"max", "21474836.47", 2147483647, false},
+		{"negative_max", "-21474836.47", -2147483647, false},
+		{"min", "-21474836.48", -2147483648, false},
+		{"overflow_integer", "21474837", 0, true},
+		{"overflow_digits", "21474836.48", 0, true},
+		{"too_long", "12345678901234567", 0, true},
+		{"invalid", "123.123.123", 0, true},
+		{"invalid_integer_char", "12a.5", 0, true},
+		{"invalid_fraction_char", "12.a5", 0, true},
+		{"invalid_second_fraction_char", "12.5a", 0, true},
+		{"empty", "", 0, true},
+		{"bare_minus", "-", 0, true},
+		{"bare_dot", ".", 0, true},
+		{"minus_dot", "-.", 0, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := decimal.NewFixedFromString(tt.s)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NewFixedFromString() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("NewFixedFromString() = %d, want %d", int32(got), int32(tt.want))
+			}
+		})
+	}
+}
+
+func BenchmarkNewFixedFromString(b *testing.B) {
+	benchmarks := []struct {
+		name string
+		s    string
+	}{
+		{"integer", "123"},
+		{"fraction", "0.12"},
+		{"digits", "123.45"},
+		{"long", "1234567.89"},
+	}
+	for _, bb := range benchmarks {
+		b.Run(bb.name, func(b *testing.B) {
+			for b.Loop() {
+				_, _ = decimal.NewFixedFromString(bb.s)
+			}
+		})
+	}
+}
+
+func TestFixed_String(t *testing.T) {
+	tests := []struct {
+		name string
+		f    decimal.Fixed
+		want string
+	}{
+		{"zero", 0, "0.00"},
+		{"fraction", 5, "0.05"},
+		{"fraction_full", 99, "0.99"},
+		{"one", 100, "1.00"},
+		{"integer", 12300, "123.00"},
+		{"digits", 12345, "123.45"},
+		{"max_int32", 2147483647, "21474836.47"},
+		{"negative_fraction", -5, "-0.05"},
+		{"negative_integer", -500, "-5.00"},
+		{"negative_digits", -12345, "-123.45"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.f.String(); got != tt.want {
+				t.Errorf("Fixed.String() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func BenchmarkFixed_String(b *testing.B) {
+	f := decimal.Fixed(12345)
+	for b.Loop() {
+		_ = f.String()
+	}
+}
+
+func TestFixed_MarshalText(t *testing.T) {
+	tests := []struct {
+		name string
+		f    decimal.Fixed
+		want string
+	}{
+		{"zero", 0, "0.00"},
+		{"fraction", 5, "0.05"},
+		{"fraction_full", 99, "0.99"},
+		{"one", 100, "1.00"},
+		{"integer", 12300, "123.00"},
+		{"digits", 12345, "123.45"},
+		{"max_int32", 2147483647, "21474836.47"},
+		{"negative_fraction", -5, "-0.05"},
+		{"negative_integer", -500, "-5.00"},
+		{"negative_digits", -12345, "-123.45"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.f.MarshalText()
+			if err != nil {
+				t.Fatalf("MarshalText() error = %v", err)
+			}
+			if string(got) != tt.want {
+				t.Errorf("MarshalText() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func BenchmarkFixed_MarshalText(b *testing.B) {
+	f := decimal.Fixed(12345)
+	for b.Loop() {
+		_, _ = f.MarshalText()
+	}
+}
+
+func TestFixed_UnmarshalText(t *testing.T) {
+	tests := []struct {
+		name    string
+		data    string
+		initial decimal.Fixed
+		want    decimal.Fixed
+		wantErr bool
+	}{
+		{"zero", "0.0", 12345, 0, false},
+		{"integer", "123", 0, 12300, false},
+		{"fraction", "0.12", 0, 12, false},
+		{"digits", "123.45", 0, 12345, false},
+		{"negative", "-123.45", 0, -12345, false},
+		{"max", "21474836.47", 0, 2147483647, false},
+		{"truncated", "123.456", 12345, 12345, true},
+		{"overflow", "21474837", 12345, 12345, true},
+		{"invalid", "abc", 12345, 12345, true},
+		{"empty", "", 12345, 12345, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := tt.initial
+			err := f.UnmarshalText([]byte(tt.data))
+			if (err != nil) != tt.wantErr {
+				t.Errorf("UnmarshalText() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if f != tt.want {
+				t.Errorf("UnmarshalText() = %d, want %d", int32(f), int32(tt.want))
+			}
+		})
+	}
+}
+
+func TestFixed_TextRoundTrip(t *testing.T) {
+	values := []decimal.Fixed{0, 1, 99, 100, 12345, 2147483647, -1, -500, -12345}
+	for _, v := range values {
+		data, err := v.MarshalText()
+		if err != nil {
+			t.Fatalf("MarshalText(%d) error = %v", int32(v), err)
+		}
+		var got decimal.Fixed
+		if err := got.UnmarshalText(data); err != nil {
+			t.Fatalf("UnmarshalText(%q) error = %v", data, err)
+		}
+		if got != v {
+			t.Errorf("round-trip mismatch: got %d, want %d", int32(got), int32(v))
+		}
+	}
+}
+
+func BenchmarkFixed_UnmarshalText(b *testing.B) {
+	var f decimal.Fixed
+	data := []byte("123.45")
+	for b.Loop() {
+		_ = f.UnmarshalText(data)
 	}
 }

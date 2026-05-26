@@ -8,7 +8,7 @@ import (
 var pow10 = [20]uint64{1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000, 10000000000, 100000000000, 1000000000000, 10000000000000, 100000000000000, 1000000000000000, 10000000000000000, 100000000000000000, 1000000000000000000, 10000000000000000000}
 
 type Number interface {
-	uint | uint8 | uint16 | uint32 | uint64 | int | int8 | int16 | int32 | int64 | float32 | float64 | Decimal
+	uint | uint8 | uint16 | uint32 | uint64 | int | int8 | int16 | int32 | int64 | float32 | float64 | Decimal | Fixed
 }
 
 // New converts any of the builtin numeric types in Go to a decimal value.
@@ -113,6 +113,8 @@ func New[N Number](value N) Decimal {
 		return d
 	case Decimal:
 		return v
+	case Fixed:
+		return v.Decimal()
 	default:
 		panic("unsupported type: generics failed")
 	}

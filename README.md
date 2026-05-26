@@ -6,9 +6,11 @@ It is designed for high performance, compact storage, straightforward formatting
 
 It is **not** an arbitrary-precision decimal library.
 
-## Representation
+## Representations
 
-A `Decimal` stores:
+There are two types in this package, `Decimal` for high-precision values and calculations and `Fixed` for efficient storage as a fixed-point value with 2 digits after the decimal point.
+
+`Decimal` stores:
 
 - a sign bit
 - an unsigned 64-bit integer part
@@ -28,6 +30,10 @@ That means the type can represent values such as:
 - `0.000000000000000001`
 
 but not arbitrary precision or more than 19 digits after the decimal point.
+
+`Fixed` is effectively just a 32-bit integer storing the value multiplied by 100. It is 4 bytes in size and handles values in the range [-21474836.48, 21474836.47].
+
+Conversion between the two types is very efficient and lossless as long as the value fits in the range that can be represented by `Fixed` (meaning it is between the minimum and maximum supported values and has at most 2 digits after the decimal point).
 
 ## Installation
 
@@ -78,6 +84,8 @@ Behavior:
 - `NaN`, `+Inf`, and `-Inf` are converted to zero
 - finite floats larger than the `uint64` range inherit Go's `float`-to-`uint64` overflow behavior
 
+In addition, it accepts `Fixed` which is converted losslessly.
+
 ### `NewFromString`
 
 `NewFromString` parses a strict decimal string:
@@ -110,6 +118,42 @@ This is intended for loose extraction, not strict validation.
 
 `Zero` creates a zero-valued decimal value.
 
+### `NewFixed`
+
+`NewFixed` is a generic constructor that accepts Go builtin numeric types:
+
+- `uint`, `uint8`, `uint16`, `uint32`, `uint64`
+- `int`, `int8`, `int16`, `int32`, `int64`
+- `float32`, `float64`
+
+Behavior:
+
+- integer inputs up to ±21474836 are represented exactly
+- floating point values are truncated to 2 digits after the decimal point
+- floating point errors are not corrected for
+- `NaN`, `+Inf`, and `-Inf` are converted to zero
+- all values outside the [-21474836.48, 21474836.47] range overflow
+
+In addition, it accepts `Decimal` which is converted by truncating to 2 digits after the decimal point if necessary and may overflow if the value is outside the supported range.
+
+### `NewFixedFromString`
+
+`NewFixedFromString` parses a strict decimal string:
+
+```go
+d, err := decimal.NewFixedFromString("-123.4500")
+```
+
+Notes:
+
+- accepts an optional leading `-`
+- accepts a leading decimal point such as `.25`
+- accepts a trailing decimal point such as `123.`
+- rejects extra surrounding characters
+- rejects all values outside the range [-21474836.48, 21474836.47]
+- input is limited to 16 characters including leading and trailing zeros but excluding sign
+- leading zeros are allowed and do not by themselves cause integer overflow
+
 ## Arithmetic
 
 The package currently provides:
@@ -131,6 +175,8 @@ Operations that require more than 19 digits after the decimal point may lose pre
 
 All arithmetic operations accept `Decimal` values as well as any of the primitive Go numeric types, converting to `Decimal` as described by `New`.
 
+`Fixed` values are accepted as input but are (losslessly) converted to `Decimal` for calculations and the result is returned as a `Decimal`.
+
 ## Equality / Comparison
 
 `Equal` compares values after canonical trailing-zero truncation.
@@ -143,7 +189,7 @@ b, _ := decimal.NewFromString("0.10")
 decimal.Equal(a, b) // true
 ```
 
-`Compare` compares to values and returns `-1` if `a < b`, `0` if `a = b` and 1 if `a > b`.
+`Compare` compares two values and returns `-1` if `a < b`, `0` if `a = b` and 1 if `a > b`.
 
 ```go
 a := decimal.New(1)
@@ -157,7 +203,18 @@ decimal.Compare(a, b) // 1
 decimal.New(0).IsZero() // true
 ```
 
+While `Fixed` values can be used with these equality operators, due to their representation as an `int32`, native Go comparison operators can be used to compare two values of type `Fixed` as well and will behave correctly.
+
+```go
+decimal.NewFixed(3.75) < decimal.NewFixed(1.5) // false
+decimal.NewFixed(0) == 0 // true
+```
+
+Comparing to untyped constants is possible but outside of `0`, you need to account for the value semantics of the type.
+
 ## Precision
+
+### `Decimal`
 
 Creating decimal values from strings adheres to the precision on the input.
 Conversion of numeric types uses the least amount of fractional digits possible to represent the exact converted value.
@@ -183,6 +240,12 @@ d.ToDigits(2) // 1.99
 d.Round(2)    // 2.00
 ```
 
+### `Fixed`
+
+Fixed-point values always use a precision of two digits after the decimal point.
+Conversion via `NewFixed` truncates and overflows silently for values that cannot be represented accurately.
+All other parsing functions reject inputs that cannot be accurately represented.
+
 ## Formatting And Conversion
 
 - `String()` returns a decimal string without scientific notation
@@ -192,7 +255,7 @@ d.Round(2)    // 2.00
 
 ### JSON
 
-The type implements `json.Marshaler` and `json.Unmarshaler`.
+The types implement `json.Marshaler` and `json.Unmarshaler`.
 
 Behavior:
 
@@ -213,7 +276,7 @@ Examples:
 
 ### SQL
 
-The type implements `sql.Scanner` and `driver.Valuer`.
+The types implement `sql.Scanner` and `driver.Valuer`.
 
 Supported `Scan` inputs:
 
@@ -231,7 +294,7 @@ Behavior:
 
 ### CBOR
 
-The type implements CBOR marshaling and unmarshaling.
+The types implement CBOR marshaling and unmarshaling.
 
 Behavior:
 
@@ -239,6 +302,7 @@ Behavior:
 - values with a fractional part are encoded as RFC 8949 decimal fractions (tag 4)
 - large mantissas are encoded using CBOR bignum tags when needed
 - unmarshaling also accepts CBOR integers and CBOR float16/32/64 values
+- `Fixed` behaves as if it were encoded as a `Decimal` with `Digits == 2`
 
 Interoperability note:
 
@@ -270,3 +334,9 @@ decimal.Decimal{Fraction: 123, Digits: 2}  // Fraction value exceeds defined dig
 decimal.Decimal{Fraction: 123, Digits: 20} // Digits exceeds 19
 decimal.Decimal{Negative: true}            // Negative zero
 ```
+
+Similarly to `Decimal`, `Fixed` exposes the raw value and allows performing arithmetic on it or overwriting it.
+
+When doing so, you must remember the value is effectively stored multiplied by 100.
+
+The entire `int32` range is valid, so there are no values that need special handling.

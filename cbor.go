@@ -315,3 +315,49 @@ func (d *Decimal) UnmarshalCBOR(data []byte) error {
 		return fmt.Errorf("cbor: unexpected major type %d, cannot parse as decimal", data[0]>>5)
 	}
 }
+
+// MarshalCBOR implements the cbor.Marshaler interface.
+// It encodes the fixed-point value as a Decimal Fraction, identical to Decimal.MarshalCBOR.
+func (f Fixed) MarshalCBOR() ([]byte, error) {
+	return f.Decimal().MarshalCBOR()
+}
+
+// UnmarshalCBOR implements the cbor.Unmarshaler interface.
+// It decodes the value as a Decimal and converts it, rejecting values that carry
+// more than two fractional digits or fall outside the fixed-point range.
+func (f *Fixed) UnmarshalCBOR(data []byte) error {
+	var d Decimal
+	err := d.UnmarshalCBOR(data)
+	if err != nil {
+		return err
+	}
+	d = d.Truncate()
+	var frac uint64
+	switch d.Digits {
+	case 0:
+	case 1:
+		frac = d.Fraction * 10
+	case 2:
+		frac = d.Fraction
+	default:
+		return fmt.Errorf("too many decimal digits: %v", d)
+	}
+	if d.Integer > math.MaxUint32 {
+		return fmt.Errorf("value exceeds fixed-point range")
+	}
+
+	val := int64(d.Integer*100 + frac)
+	if d.Negative {
+		val = -val
+		if val < math.MinInt32 {
+			return fmt.Errorf("value exceeds fixed-point range")
+		}
+		*f = Fixed(val)
+		return nil
+	}
+	if val > math.MaxInt32 {
+		return fmt.Errorf("value exceeds fixed-point range")
+	}
+	*f = Fixed(val)
+	return nil
+}

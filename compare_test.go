@@ -119,3 +119,25 @@ func TestDecimal_IsZero(t *testing.T) {
 		})
 	}
 }
+
+func TestFixed_IsZero(t *testing.T) {
+	tests := []struct {
+		name string
+		d    decimal.Fixed
+		want bool
+	}{
+		{"zero_value", 0, true},
+		{"integer_only", 100, false},
+		{"fraction_only", 1, false},
+		{"both", 101, false},
+		{"negative_integer", -100, false},
+		{"negative_fraction", -5, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.d.IsZero(); got != tt.want {
+				t.Errorf("Fixed.IsZero() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

@@ -172,3 +172,125 @@ func BenchmarkDecimal_UnmarshalJSONFrom(b *testing.B) {
 		r.Reset(data)
 	}
 }
+
+func TestFixed_MarshalJSONTo(t *testing.T) {
+	tests := []struct {
+		name string
+		f    decimal.Fixed
+		want string
+	}{
+		{"zero", 0, "0.00"},
+		{"fraction", 5, "0.05"},
+		{"one", 100, "1.00"},
+		{"integer", 12300, "123.00"},
+		{"digits", 12345, "123.45"},
+		{"max_int32", 2147483647, "21474836.47"},
+		{"negative_digits", -12345, "-123.45"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			enc := jsontext.NewEncoder(&buf)
+			if err := tt.f.MarshalJSONTo(enc); err != nil {
+				t.Fatalf("MarshalJSONTo() error = %v", err)
+			}
+			if got := buf.String(); got != tt.want+"\n" {
+				t.Errorf("MarshalJSONTo() = %q, want %q", got, tt.want+"\n")
+			}
+		})
+	}
+}
+
+func BenchmarkFixed_MarshalJSONTo(b *testing.B) {
+	f := decimal.Fixed(12345)
+	var buf bytes.Buffer
+	enc := jsontext.NewEncoder(&buf)
+	for b.Loop() {
+		buf.Reset()
+		_ = f.MarshalJSONTo(enc)
+	}
+}
+
+func TestFixed_UnmarshalJSONFrom(t *testing.T) {
+	tests := []struct {
+		name    string
+		data    string
+		initial decimal.Fixed
+		want    decimal.Fixed
+		wantErr bool
+	}{
+		{"zero", "0.0", 12345, 0, false},
+		{"bare_integer", "123", 0, 12300, false},
+		{"fraction", "0.12", 0, 12, false},
+		{"digits", "123.45", 0, 12345, false},
+		{"negative_digits", "-123.45", 0, -12345, false},
+		{"null", "null", 12345, 0, false},
+		{"quote", `"123.45"`, 0, 12345, false},
+		{"bad", "bad", 12345, 12345, true},
+		{"truncated", "123.456", 12345, 12345, true},
+		{"true", "true", 12345, 12345, true},
+		{"false", "false", 12345, 12345, true},
+		{"empty_array", "[]", 12345, 12345, true},
+		{"empty_object", "{}", 12345, 12345, true},
+		{"array", "[123.45]", 12345, 12345, true},
+		{"object", `{"value":123.45}`, 12345, 12345, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := tt.initial
+			dec := jsontext.NewDecoder(bytes.NewReader([]byte(tt.data)))
+			err := f.UnmarshalJSONFrom(dec)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("UnmarshalJSONFrom() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if f != tt.want {
+				t.Errorf("UnmarshalJSONFrom() = %d, want %d", int32(f), int32(tt.want))
+			}
+		})
+	}
+}
+
+func TestFixed_UnmarshalJSONFrom_struct(t *testing.T) {
+	type S struct {
+		F decimal.Fixed `json:"f"`
+	}
+	tests := []struct {
+		name    string
+		data    string
+		initial decimal.Fixed
+		want    decimal.Fixed
+		wantErr bool
+	}{
+		{"zero", `{"f":0.0}`, 12345, 0, false},
+		{"bare_integer", `{"f":123}`, 0, 12300, false},
+		{"digits", `{"f":123.45}`, 0, 12345, false},
+		{"negative", `{"f":-123.45}`, 0, -12345, false},
+		{"null", `{"f":null}`, 12345, 0, false},
+		{"quote", `{"f":"123.45"}`, 0, 12345, false},
+		{"linebreaks", "{\n\t\"f\": 123.45\n}\n", 0, 12345, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := S{F: tt.initial}
+			dec := jsontext.NewDecoder(bytes.NewReader([]byte(tt.data)))
+			err := json.UnmarshalDecode(dec, &s)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("UnmarshalDecode() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if s.F != tt.want {
+				t.Errorf("UnmarshalDecode() = %d, want %d", int32(s.F), int32(tt.want))
+			}
+		})
+	}
+}
+
+func BenchmarkFixed_UnmarshalJSONFrom(b *testing.B) {
+	data := []byte("123.45")
+	r := bytes.NewReader(data)
+	dec := jsontext.NewDecoder(r)
+	for b.Loop() {
+		var f decimal.Fixed
+		_ = f.UnmarshalJSONFrom(dec)
+		r.Reset(data)
+	}
+}

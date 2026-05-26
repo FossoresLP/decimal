@@ -89,3 +89,41 @@ func FuzzDecimal_NewFloat(f *testing.F) {
 		}
 	})
 }
+
+func TestFixed_Float64(t *testing.T) {
+	tests := []struct {
+		name string
+		f    decimal.Fixed
+		want float64
+	}{
+		{"zero", 0, 0},
+		{"hundredth", 1, 0.01},
+		{"fraction", 5, 0.05},
+		{"one", 100, 1},
+		{"integer", 12300, 123},
+		{"digits", 12345, 123.45},
+		{"negative_hundredth", -5, -0.05},
+		{"negative_integer", -500, -5},
+		{"negative_digits", -12345, -123.45},
+		{"negative_one_hundredth", -1, -0.01},
+		{"two_nines", 99, 0.99},
+		{"large_fraction", 9999, 99.99},
+		{"negative_large_fraction", -9999, -99.99},
+		{"max", math.MaxInt32, 21474836.47},
+		{"min", math.MinInt32, -21474836.48},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.f.Float64(); got != tt.want {
+				t.Errorf("Fixed.Float64() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func BenchmarkFixed_Float64(b *testing.B) {
+	f := decimal.Fixed(12345)
+	for b.Loop() {
+		_ = f.Float64()
+	}
+}
