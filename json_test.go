@@ -9,28 +9,26 @@ import (
 
 func TestDecimal_MarshalJSON(t *testing.T) {
 	tests := []struct {
-		name    string
-		d       decimal.Decimal
-		want    []byte
-		wantErr bool
+		name string
+		d    decimal.Decimal
+		want string
 	}{
-		{"zero", decimal.Decimal{}, []byte("0"), false},
-		{"integer", decimal.Decimal{Integer: 123}, []byte("123"), false},
-		{"fraction", decimal.Decimal{Fraction: 123, Digits: 3}, []byte("0.123"), false},
-		{"digits", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, []byte("123.123"), false},
-		{"negative_integer", decimal.Decimal{Integer: 123, Negative: true}, []byte("-123"), false},
-		{"negative_fraction", decimal.Decimal{Integer: 123, Fraction: 456, Digits: 3, Negative: true}, []byte("-123.456"), false},
-		{"max_uint64_integer", decimal.Decimal{Integer: ^uint64(0)}, []byte("18446744073709551615"), false},
+		{"zero", decimal.Decimal{}, "0"},
+		{"integer", decimal.Decimal{Integer: 123}, "123"},
+		{"fraction", decimal.Decimal{Fraction: 123, Digits: 3}, "0.123"},
+		{"digits", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, "123.123"},
+		{"negative_integer", decimal.Decimal{Integer: 123, Negative: true}, "-123"},
+		{"negative_fraction", decimal.Decimal{Integer: 123, Fraction: 456, Digits: 3, Negative: true}, "-123.456"},
+		{"max_uint64_integer", decimal.Decimal{Integer: ^uint64(0)}, "18446744073709551615"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.d.MarshalJSON()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Decimal.MarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
-				return
+			if err != nil {
+				t.Fatalf("Decimal.MarshalJSON() error = %v", err)
 			}
-			if string(got) != string(tt.want) {
-				t.Errorf("Decimal.MarshalJSON() = %v, want %v", string(got), string(tt.want))
+			if string(got) != tt.want {
+				t.Errorf("Decimal.MarshalJSON() = %v, want %v", string(got), tt.want)
 			}
 		})
 	}
@@ -66,29 +64,38 @@ func BenchmarkDecimal_MarshalJSON(b *testing.B) {
 }
 
 func TestDecimal_UnmarshalJSON(t *testing.T) {
+	sentinel := decimal.Decimal{Integer: 7, Fraction: 5, Digits: 1}
 	tests := []struct {
 		name    string
-		d       decimal.Decimal
 		data    []byte
+		initial decimal.Decimal
+		want    decimal.Decimal
 		wantErr bool
 	}{
-		{"zero", decimal.Decimal{}, []byte("0.0"), false},
-		{"integer", decimal.Decimal{}, []byte("123.0"), false},
-		{"fraction", decimal.Decimal{}, []byte("0.123"), false},
-		{"digits", decimal.Decimal{}, []byte("123.123"), false},
-		{"null", decimal.Decimal{}, []byte("null"), false},
-		{"invalid", decimal.Decimal{}, []byte("123.123.123"), true},
-		{"true", decimal.Decimal{}, []byte("true"), true},
-		{"false", decimal.Decimal{}, []byte("false"), true},
-		{"empty_array", decimal.Decimal{}, []byte("[]"), true},
-		{"empty_object", decimal.Decimal{}, []byte("{}"), true},
-		{"array", decimal.Decimal{}, []byte("[123.123]"), true},
-		{"object", decimal.Decimal{}, []byte(`{"value":123.123}`), true},
+		{"zero", []byte("0.0"), sentinel, decimal.Decimal{Digits: 1}, false},
+		{"integer", []byte("123.0"), sentinel, decimal.Decimal{Integer: 123, Digits: 1}, false},
+		{"fraction", []byte("0.123"), sentinel, decimal.Decimal{Fraction: 123, Digits: 3}, false},
+		{"digits", []byte("123.123"), sentinel, decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, false},
+		{"quote", []byte(`"123.123"`), sentinel, decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, false},
+		{"null", []byte("null"), sentinel, decimal.Decimal{}, false},
+		{"overflow_string", []byte(`"18446744073709551616"`), sentinel, sentinel, true},
+		{"bad", []byte("bad"), sentinel, sentinel, true},
+		{"invalid", []byte("123.123.123"), sentinel, sentinel, true},
+		{"true", []byte("true"), sentinel, sentinel, true},
+		{"false", []byte("false"), sentinel, sentinel, true},
+		{"empty_array", []byte("[]"), sentinel, sentinel, true},
+		{"empty_object", []byte("{}"), sentinel, sentinel, true},
+		{"array", []byte("[123.123]"), sentinel, sentinel, true},
+		{"object", []byte(`{"value":123.123}`), sentinel, sentinel, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.d.UnmarshalJSON(tt.data); (err != nil) != tt.wantErr {
+			d := tt.initial
+			if err := d.UnmarshalJSON(tt.data); (err != nil) != tt.wantErr {
 				t.Errorf("Decimal.UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if d != tt.want {
+				t.Errorf("Decimal.UnmarshalJSON() = %#v, want %#v", d, tt.want)
 			}
 		})
 	}
@@ -98,58 +105,42 @@ func TestDecimal_UnmarshalJSON_struct(t *testing.T) {
 	type S struct {
 		D decimal.Decimal `json:"d"`
 	}
+	sentinel := decimal.Decimal{Integer: 7, Fraction: 5, Digits: 1}
 	tests := []struct {
 		name    string
 		data    []byte
+		initial decimal.Decimal
+		want    decimal.Decimal
 		wantErr bool
-		value   float64
 	}{
-		{"zero", []byte(`{"d":0.0}`), false, 0.0},
-		{"integer", []byte(`{"d":123.0}`), false, 123.0},
-		{"fraction", []byte(`{"d":0.123}`), false, 0.123},
-		{"digits", []byte(`{"d":123.123}`), false, 123.123},
-		{"null", []byte(`{"d":null}`), false, 0.0},
-		{"maxuint64_string", []byte(`{"d":"18446744073709551615"}`), false, 18446744073709551615.0},
-		{"maxuint64_plus_one_string", []byte(`{"d":"18446744073709551616"}`), true, 0.0},
-		{"invalid", []byte(`{"d":123.123.123}`), true, 0.0},
-		{"true", []byte(`{"d":true}`), true, 0.0},
-		{"false", []byte(`{"d":false}`), true, 0.0},
-		{"empty_array", []byte(`{"d":[]}`), true, 0.0},
-		{"empty_object", []byte(`{"d":{}}`), true, 0.0},
-		{"array", []byte(`{"d":[123.123]}`), true, 0.0},
-		{"object", []byte(`{"d":{"value":123.123}}`), true, 0.0},
-		{"linebreaks", []byte("{\n\t\"d\": 123.123\n}\n"), false, 123.123},
-		{"quote", []byte("{\"d\": \"123.123\"}"), false, 123.123},
-		{"mismatched_quote", []byte("{\"d\": \"123.123}"), true, 0.0},
+		{"zero", []byte(`{"d":0.0}`), sentinel, decimal.Decimal{Digits: 1}, false},
+		{"integer", []byte(`{"d":123.0}`), sentinel, decimal.Decimal{Integer: 123, Digits: 1}, false},
+		{"fraction", []byte(`{"d":0.123}`), sentinel, decimal.Decimal{Fraction: 123, Digits: 3}, false},
+		{"digits", []byte(`{"d":123.123}`), sentinel, decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, false},
+		{"null", []byte(`{"d":null}`), sentinel, decimal.Decimal{}, false},
+		{"maxuint64_string", []byte(`{"d":"18446744073709551615"}`), sentinel, decimal.Decimal{Integer: 18446744073709551615}, false},
+		{"maxuint64_plus_one_string", []byte(`{"d":"18446744073709551616"}`), sentinel, sentinel, true},
+		{"invalid", []byte(`{"d":123.123.123}`), sentinel, sentinel, true},
+		{"true", []byte(`{"d":true}`), sentinel, sentinel, true},
+		{"false", []byte(`{"d":false}`), sentinel, sentinel, true},
+		{"empty_array", []byte(`{"d":[]}`), sentinel, sentinel, true},
+		{"empty_object", []byte(`{"d":{}}`), sentinel, sentinel, true},
+		{"array", []byte(`{"d":[123.123]}`), sentinel, sentinel, true},
+		{"object", []byte(`{"d":{"value":123.123}}`), sentinel, sentinel, true},
+		{"linebreaks", []byte("{\n\t\"d\": 123.123\n}\n"), sentinel, decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, false},
+		{"quote", []byte("{\"d\": \"123.123\"}"), sentinel, decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, false},
+		{"mismatched_quote", []byte("{\"d\": \"123.123}"), sentinel, sentinel, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var s S
+			s := S{D: tt.initial}
 			if err := json.Unmarshal(tt.data, &s); (err != nil) != tt.wantErr {
 				t.Errorf("json.Unmarshal() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if s.D.Float64() != tt.value {
-				t.Errorf("json.Unmarshal() = %v, want %v", s.D.Float64(), tt.value)
+			if s.D != tt.want {
+				t.Errorf("json.Unmarshal() = %#v, want %#v", s.D, tt.want)
 			}
 		})
-	}
-}
-
-func TestDecimal_UnmarshalJSON_ErrorKeepsReceiver(t *testing.T) {
-	d := decimal.Decimal{Integer: 7, Fraction: 5, Digits: 1}
-	if err := d.UnmarshalJSON([]byte("bad")); err == nil {
-		t.Fatal("UnmarshalJSON(bad) error = nil, want non-nil")
-	}
-	if d != (decimal.Decimal{Integer: 7, Fraction: 5, Digits: 1}) {
-		t.Errorf("UnmarshalJSON(bad) changed receiver: got %#v", d)
-	}
-
-	d = decimal.Decimal{Integer: 7, Fraction: 5, Digits: 1}
-	if err := d.UnmarshalJSON([]byte(`"18446744073709551616"`)); err == nil {
-		t.Fatal("UnmarshalJSON(overflow string) error = nil, want non-nil")
-	}
-	if d != (decimal.Decimal{Integer: 7, Fraction: 5, Digits: 1}) {
-		t.Errorf("UnmarshalJSON(overflow string) changed receiver: got %#v", d)
 	}
 }
 

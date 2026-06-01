@@ -9,10 +9,10 @@ import (
 
 func TestDecimal_Add(t *testing.T) {
 	tests := []struct {
-		name     string
-		a        decimal.Decimal
-		b        decimal.Decimal
-		expected decimal.Decimal
+		name string
+		a    decimal.Decimal
+		b    decimal.Decimal
+		want decimal.Decimal
 	}{
 		{"zero", decimal.Decimal{}, decimal.Decimal{}, decimal.Decimal{}},
 		{"integer", decimal.Decimal{Integer: 123}, decimal.Decimal{Integer: 456}, decimal.Decimal{Integer: 579}},
@@ -41,8 +41,8 @@ func TestDecimal_Add(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			sum := decimal.Add(tt.a, tt.b)
-			if !decimal.Equal(tt.expected, sum) {
-				t.Errorf("Decimal.Add() = %v, want %v", sum, tt.expected)
+			if !decimal.Equal(tt.want, sum) {
+				t.Errorf("Decimal.Add() = %v, want %v", sum, tt.want)
 			}
 		})
 	}
@@ -96,10 +96,10 @@ func TestAdd_Commutativity(t *testing.T) {
 
 func TestSubtract(t *testing.T) {
 	tests := []struct {
-		name     string
-		a        decimal.Decimal
-		b        decimal.Decimal
-		expected decimal.Decimal
+		name string
+		a    decimal.Decimal
+		b    decimal.Decimal
+		want decimal.Decimal
 	}{
 		{"zero_minus_zero", decimal.Decimal{}, decimal.Decimal{}, decimal.Decimal{}},
 		{"integer_minus_integer", decimal.Decimal{Integer: 7}, decimal.Decimal{Integer: 3}, decimal.Decimal{Integer: 4}},
@@ -117,8 +117,8 @@ func TestSubtract(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := decimal.Subtract(tt.a, tt.b)
-			if !decimal.Equal(tt.expected, result) {
-				t.Errorf("Subtract() = %v (%#v), want %v (%#v)", result, result, tt.expected, tt.expected)
+			if !decimal.Equal(tt.want, result) {
+				t.Errorf("Subtract() = %v (%#v), want %v (%#v)", result, result, tt.want, tt.want)
 			}
 		})
 	}
@@ -149,10 +149,10 @@ func TestSubtract_AddInverse(t *testing.T) {
 
 func TestMultiply(t *testing.T) {
 	tests := []struct {
-		name     string
-		a        decimal.Decimal
-		b        decimal.Decimal
-		expected decimal.Decimal
+		name string
+		a    decimal.Decimal
+		b    decimal.Decimal
+		want decimal.Decimal
 	}{
 		{"zero_times_zero", decimal.Decimal{}, decimal.Decimal{}, decimal.Decimal{}},
 		{"zero_times_value", decimal.Decimal{}, decimal.Decimal{Integer: 5}, decimal.Decimal{}},
@@ -177,8 +177,8 @@ func TestMultiply(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := decimal.Multiply(tt.a, tt.b)
-			if !decimal.Equal(tt.expected, result) {
-				t.Errorf("Multiply() = %v (%#v), want %v (%#v)", result, result, tt.expected, tt.expected)
+			if !decimal.Equal(tt.want, result) {
+				t.Errorf("Multiply() = %v (%#v), want %v (%#v)", result, result, tt.want, tt.want)
 			}
 		})
 	}
@@ -186,10 +186,10 @@ func TestMultiply(t *testing.T) {
 
 func TestMultiply_Int(t *testing.T) {
 	tests := []struct {
-		name     string
-		a        decimal.Decimal
-		b        uint64
-		expected decimal.Decimal
+		name string
+		a    decimal.Decimal
+		b    uint64
+		want decimal.Decimal
 	}{
 		{"zero", decimal.Decimal{Integer: 123, Fraction: 456, Digits: 3}, 0, decimal.Decimal{Digits: 3}},
 		{"negative_to_zero", decimal.Decimal{Integer: 5, Negative: true}, 0, decimal.Decimal{}},
@@ -206,8 +206,8 @@ func TestMultiply_Int(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			product := decimal.Multiply(tt.a, tt.b)
-			if !decimal.Equal(tt.expected, product) {
-				t.Errorf("Decimal.MultiplyUint64() = %v, want %v", product, tt.expected)
+			if !decimal.Equal(tt.want, product) {
+				t.Errorf("Decimal.MultiplyUint64() = %v, want %v", product, tt.want)
 			}
 		})
 	}
@@ -304,10 +304,10 @@ func BenchmarkMultiply(b *testing.B) {
 
 func TestDivide(t *testing.T) {
 	tests := []struct {
-		name     string
-		a        decimal.Decimal
-		b        decimal.Decimal
-		expected decimal.Decimal
+		name string
+		a    decimal.Decimal
+		b    decimal.Decimal
+		want decimal.Decimal
 	}{
 		{"integer_exact", decimal.Decimal{Integer: 10}, decimal.Decimal{Integer: 2}, decimal.Decimal{Integer: 5, Digits: 19}},
 		{"integer_with_remainder", decimal.Decimal{Integer: 10}, decimal.Decimal{Integer: 3}, decimal.Decimal{Integer: 3, Fraction: 3333333333333333333, Digits: 19}},
@@ -331,8 +331,8 @@ func TestDivide(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := decimal.Divide(tt.a, tt.b)
-			if !decimal.Equal(tt.expected, result) {
-				t.Errorf("Divide() = %v (%#v), want %v (%#v)", result, result, tt.expected, tt.expected)
+			if !decimal.Equal(tt.want, result) {
+				t.Errorf("Divide() = %v (%#v), want %v (%#v)", result, result, tt.want, tt.want)
 			}
 		})
 	}
@@ -361,10 +361,10 @@ func TestDivide_MultiplyRoundTrip(t *testing.T) {
 
 func TestDivide_Int(t *testing.T) {
 	tests := []struct {
-		name     string
-		dividend decimal.Decimal
-		divisor  int
-		expected decimal.Decimal
+		name string
+		a    decimal.Decimal
+		b    int
+		want decimal.Decimal
 	}{
 		{"one", decimal.Decimal{Integer: 123, Fraction: 456, Digits: 3}, 1, decimal.Decimal{Integer: 123, Fraction: 456, Digits: 3}},
 		{"integer", decimal.Decimal{Integer: 123}, 2, decimal.Decimal{Integer: 61, Fraction: 5, Digits: 1}},
@@ -378,9 +378,9 @@ func TestDivide_Int(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			quotient := decimal.Divide(tt.dividend, tt.divisor)
-			if !decimal.Equal(tt.expected, quotient) {
-				t.Errorf("Divide(Decimal, int) = %v, want %v", quotient, tt.expected)
+			quotient := decimal.Divide(tt.a, tt.b)
+			if !decimal.Equal(tt.want, quotient) {
+				t.Errorf("Divide(Decimal, int) = %v, want %v", quotient, tt.want)
 			}
 		})
 	}
@@ -410,9 +410,9 @@ func TestAdd_OverflowWraps(t *testing.T) {
 
 func TestNegate(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    decimal.Decimal
-		expected decimal.Decimal
+		name string
+		d    decimal.Decimal
+		want decimal.Decimal
 	}{
 		{"positive_integer", decimal.Decimal{Integer: 5}, decimal.Decimal{Integer: 5, Negative: true}},
 		{"negative_integer", decimal.Decimal{Integer: 5, Negative: true}, decimal.Decimal{Integer: 5}},
@@ -426,9 +426,9 @@ func TestNegate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := decimal.Negate(tt.input)
-			if !decimal.Equal(tt.expected, result) {
-				t.Errorf("Negate() = %v (%#v), want %v (%#v)", result, result, tt.expected, tt.expected)
+			result := decimal.Negate(tt.d)
+			if !decimal.Equal(tt.want, result) {
+				t.Errorf("Negate() = %v (%#v), want %v (%#v)", result, result, tt.want, tt.want)
 			}
 		})
 	}
@@ -483,9 +483,9 @@ func TestNegate_AddInverse(t *testing.T) {
 
 func TestAbsolute(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    decimal.Decimal
-		expected decimal.Decimal
+		name string
+		d    decimal.Decimal
+		want decimal.Decimal
 	}{
 		{"positive_integer", decimal.Decimal{Integer: 5}, decimal.Decimal{Integer: 5}},
 		{"negative_integer", decimal.Decimal{Integer: 5, Negative: true}, decimal.Decimal{Integer: 5}},
@@ -500,9 +500,9 @@ func TestAbsolute(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := decimal.Absolute(tt.input)
-			if !decimal.Equal(tt.expected, result) {
-				t.Errorf("Absolute() = %v (%#v), want %v (%#v)", result, result, tt.expected, tt.expected)
+			result := decimal.Absolute(tt.d)
+			if !decimal.Equal(tt.want, result) {
+				t.Errorf("Absolute() = %v (%#v), want %v (%#v)", result, result, tt.want, tt.want)
 			}
 		})
 	}

@@ -60,11 +60,11 @@ func TestDecimal_NewFromString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := decimal.NewFromString(tt.s)
-			if err != nil && !tt.wantErr {
+			if (err != nil) != tt.wantErr {
 				t.Errorf("Decimal.NewString() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if !decimal.Equal(tt.want, got) {
-				t.Errorf("Decimal.NewString() = %v, want %v", got, tt.want)
+			if got != tt.want {
+				t.Errorf("Decimal.NewString() = %#v, want %#v", got, tt.want)
 			}
 		})
 	}
@@ -137,11 +137,11 @@ func TestDecimal_NewFromStringFuzzy(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := decimal.NewFromStringFuzzy(tt.s)
-			if err != nil && !tt.wantErr {
+			if (err != nil) != tt.wantErr {
 				t.Errorf("Decimal.NewString() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if !decimal.Equal(tt.want, got) {
-				t.Errorf("Decimal.NewString() = %v, want %v", got, tt.want)
+			if got != tt.want {
+				t.Errorf("Decimal.NewString() = %#v, want %#v", got, tt.want)
 			}
 		})
 	}
@@ -482,32 +482,35 @@ func BenchmarkDecimal_MarshalText(b *testing.B) {
 }
 
 func TestDecimal_UnmarshalText(t *testing.T) {
+	sentinel := decimal.Decimal{Integer: 7, Fraction: 5, Digits: 1}
 	tests := []struct {
 		name    string
 		data    string
+		initial decimal.Decimal
 		want    decimal.Decimal
 		wantErr bool
 	}{
-		{"zero", "0", decimal.Decimal{}, false},
-		{"zero_frac", "0.0", decimal.Decimal{Digits: 1}, false},
-		{"integer", "123", decimal.Decimal{Integer: 123}, false},
-		{"fraction", "0.123", decimal.Decimal{Fraction: 123, Digits: 3}, false},
-		{"digits", "123.123", decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, false},
-		{"negative", "-42.5", decimal.Decimal{Integer: 42, Fraction: 5, Digits: 1, Negative: true}, false},
-		{"max_uint64", "18446744073709551615", decimal.Decimal{Integer: 18446744073709551615}, false},
-		{"overflow", "18446744073709551616", decimal.Decimal{}, true},
-		{"invalid", "abc", decimal.Decimal{}, true},
-		{"empty", "", decimal.Decimal{}, true},
+		{"zero", "0", sentinel, decimal.Decimal{}, false},
+		{"zero_frac", "0.0", sentinel, decimal.Decimal{Digits: 1}, false},
+		{"integer", "123", sentinel, decimal.Decimal{Integer: 123}, false},
+		{"fraction", "0.123", sentinel, decimal.Decimal{Fraction: 123, Digits: 3}, false},
+		{"digits", "123.123", sentinel, decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}, false},
+		{"negative", "-42.5", sentinel, decimal.Decimal{Integer: 42, Fraction: 5, Digits: 1, Negative: true}, false},
+		{"max_uint64", "18446744073709551615", sentinel, decimal.Decimal{Integer: 18446744073709551615}, false},
+		{"overflow", "18446744073709551616", sentinel, sentinel, true},
+		{"bad", "bad", sentinel, sentinel, true},
+		{"invalid", "abc", sentinel, sentinel, true},
+		{"empty", "", sentinel, sentinel, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var d decimal.Decimal
+			d := tt.initial
 			err := d.UnmarshalText([]byte(tt.data))
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("UnmarshalText() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if !tt.wantErr && !decimal.Equal(d, tt.want) {
-				t.Errorf("UnmarshalText() = %v, want %v", d, tt.want)
+			if d != tt.want {
+				t.Errorf("UnmarshalText() = %#v, want %#v", d, tt.want)
 			}
 		})
 	}
@@ -518,16 +521,6 @@ func BenchmarkDecimal_UnmarshalText(b *testing.B) {
 	data := []byte("123.123")
 	for b.Loop() {
 		_ = d.UnmarshalText(data)
-	}
-}
-
-func TestDecimal_UnmarshalText_ErrorKeepsReceiver(t *testing.T) {
-	d := decimal.Decimal{Integer: 7, Fraction: 5, Digits: 1}
-	if err := d.UnmarshalText([]byte("bad")); err == nil {
-		t.Fatal("UnmarshalText(bad) error = nil, want non-nil")
-	}
-	if d != (decimal.Decimal{Integer: 7, Fraction: 5, Digits: 1}) {
-		t.Errorf("UnmarshalText(bad) changed receiver: got %#v", d)
 	}
 }
 

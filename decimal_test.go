@@ -14,44 +14,81 @@ func TestNew(t *testing.T) {
 		got  decimal.Decimal
 		want decimal.Decimal
 	}{
-		// float64
-		{"float64", decimal.New(123.123).ToDigits(3), decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}},
-		{"float64_negative", decimal.New(-123.123).ToDigits(3), decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3, Negative: true}},
-		{"float64_half", decimal.New(123.5), decimal.Decimal{Integer: 123, Fraction: 5, Digits: 1}},
-		{"float64_negative_half", decimal.New(-123.5), decimal.Decimal{Integer: 123, Fraction: 5, Digits: 1, Negative: true}},
 		// float32
-		{"float32", decimal.New(float32(123.123)).ToDigits(3), decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3}},
-		{"float32_negative", decimal.New(float32(-123.123)).ToDigits(3), decimal.Decimal{Integer: 123, Fraction: 123, Digits: 3, Negative: true}},
+		{"float32_zero", decimal.New(float32(0)), decimal.Decimal{}},
+		{"float32_integer", decimal.New(float32(123)), decimal.Decimal{Integer: 123}},
+		{"float32_fraction", decimal.New(float32(0.123)), decimal.Decimal{Fraction: 123, Digits: 3}},
+		{"float32_digits", decimal.New(float32(123.123)), decimal.Decimal{Integer: 123, Fraction: 1230011008, Digits: 10}},
+		{"float32_negative", decimal.New(float32(-123.123)), decimal.Decimal{Integer: 123, Fraction: 1230011008, Digits: 10, Negative: true}},
 		{"float32_half", decimal.New(float32(123.5)), decimal.Decimal{Integer: 123, Fraction: 5, Digits: 1}},
 		{"float32_negative_half", decimal.New(float32(-123.5)), decimal.Decimal{Integer: 123, Fraction: 5, Digits: 1, Negative: true}},
-		// int
-		{"int", decimal.New(123), decimal.Decimal{Integer: 123}},
-		{"int_negative", decimal.New(-123), decimal.Decimal{Integer: 123, Negative: true}},
-		// min-value signed integers (must widen before negation)
-		{"int8_min", decimal.New(int8(-128)), decimal.Decimal{Integer: 128, Negative: true}},
-		{"int16_min", decimal.New(int16(-32768)), decimal.Decimal{Integer: 32768, Negative: true}},
-		{"int32_min", decimal.New(int32(-2147483648)), decimal.Decimal{Integer: 2147483648, Negative: true}},
-		{"int64_min", decimal.New(int64(math.MinInt64)), decimal.Decimal{Integer: uint64(math.MaxInt64) + 1, Negative: true}},
-		// unsigned integer types
-		{"uint", decimal.New(uint(42)), decimal.Decimal{Integer: 42}},
-		{"uint8", decimal.New(uint8(255)), decimal.Decimal{Integer: 255}},
-		{"uint16", decimal.New(uint16(65535)), decimal.Decimal{Integer: 65535}},
-		{"uint32", decimal.New(uint32(4294967295)), decimal.Decimal{Integer: 4294967295}},
-		{"uint64", decimal.New(uint64(math.MaxUint64)), decimal.Decimal{Integer: math.MaxUint64}},
-		// float32 special values
+		{"float32_quarter", decimal.New(float32(0.25)), decimal.Decimal{Fraction: 25, Digits: 2}},
+		{"float32_eighth", decimal.New(float32(0.125)), decimal.Decimal{Fraction: 125, Digits: 3}},
+		{"float32_large", decimal.New(float32(1234567)), decimal.Decimal{Integer: 1234567}},
+		{"float32_seven_digits", decimal.New(float32(1234567.5)), decimal.Decimal{Integer: 1234567, Fraction: 5, Digits: 1}},
+		{"float32_indivisible", decimal.New(float32(1.0 / 3.0)), decimal.Decimal{Fraction: 3333333504, Digits: 10}},
+		{"float32_truncate", decimal.New(float32(0.999999)), decimal.Decimal{Fraction: 999998976, Digits: 9}},
+		{"float32_small", decimal.New(float32(1e-10)), decimal.Decimal{Fraction: 1, Digits: 10}},
+		{"float32_negative_small", decimal.New(float32(-1e-10)), decimal.Decimal{Fraction: 1, Digits: 10, Negative: true}},
+		{"float32_underflow", decimal.New(float32(1e-18)), decimal.Decimal{}},
+		{"float32_negative_underflow", decimal.New(float32(-1e-20)), decimal.Decimal{}},
+		{"float32_subnormal", decimal.New(float32(math.SmallestNonzeroFloat32)), decimal.Decimal{}},
+		{"float32_negative_subnormal", decimal.New(float32(-math.SmallestNonzeroFloat32)), decimal.Decimal{}},
 		{"float32_nan", decimal.New(float32(math.NaN())), decimal.Decimal{}},
 		{"float32_pos_inf", decimal.New(float32(math.Inf(1))), decimal.Decimal{}},
 		{"float32_neg_inf", decimal.New(float32(math.Inf(-1))), decimal.Decimal{}},
+		{"float32_max", decimal.New(float32(math.MaxFloat32)), decimal.Decimal{Integer: 0x8000000000000000, Fraction: 0x8000000000000000, Digits: 10}},
+		{"float32_min", decimal.New(float32(-math.MaxFloat32)), decimal.Decimal{Negative: true, Integer: 0x8000000000000000, Fraction: 0x8000000000000000, Digits: 10}},
+		{"float32_max_int32", decimal.New(float32(math.MaxInt32)), decimal.Decimal{Integer: 2147483648}},
+		{"float32_min_int32", decimal.New(float32(math.MinInt32)), decimal.Decimal{Integer: 2147483648, Negative: true}},
+		{"float32_max_uint32", decimal.New(float32(math.MaxUint32)), decimal.Decimal{Integer: 4294967296}},
+		// float64
+		{"float64_zero", decimal.New(0.0), decimal.Decimal{}},
+		{"float64_integer", decimal.New(123.0), decimal.Decimal{Integer: 123}},
+		{"float64_fraction", decimal.New(0.123), decimal.Decimal{Fraction: 123, Digits: 3}},
+		{"float64_digits", decimal.New(123.123), decimal.Decimal{Integer: 123, Fraction: 123000000000004656, Digits: 18}},
+		{"float64_negative", decimal.New(-123.123), decimal.Decimal{Integer: 123, Fraction: 123000000000004656, Digits: 18, Negative: true}},
+		{"float64_half", decimal.New(123.5), decimal.Decimal{Integer: 123, Fraction: 5, Digits: 1}},
+		{"float64_negative_half", decimal.New(-123.5), decimal.Decimal{Integer: 123, Fraction: 5, Digits: 1, Negative: true}},
+		{"float64_large", decimal.New(1234567890.1234567890), decimal.Decimal{Integer: 1234567890, Fraction: 123456716537475584, Digits: 18}},
+		{"float64_int_precision_loss", decimal.New(1234567890123456789.12345678901234567890), decimal.Decimal{Integer: 1234567890123456768}},
+		{"float64_small", decimal.New(0.000000000000000001), decimal.Decimal{Fraction: 1, Digits: 18}},
+		{"float64_negative_small", decimal.New(-0.000000000000000001), decimal.Decimal{Fraction: 1, Digits: 18, Negative: true}},
+		{"float64_indivisible", decimal.New(3.3333333333), decimal.Decimal{Integer: 3, Fraction: 333333333300000128, Digits: 18}},
+		{"float64_truncate_1", decimal.New(0.999999999999999944), decimal.Decimal{Fraction: 999999999999999872, Digits: 18}},
+		{"float64_truncate_0.5", decimal.New(0.499999999999999944), decimal.Decimal{Fraction: 499999999999999936, Digits: 18}},
+		{"float64_subnormal", decimal.New(5e-324), decimal.Decimal{}},
 		{"float64_negative_subnormal", decimal.New(-5e-324), decimal.Decimal{}},
 		{"float64_negative_tiny", decimal.New(-1e-19), decimal.Decimal{}},
-		{"float32_negative_tiny", decimal.New(float32(-1e-20)), decimal.Decimal{}},
+		{"float64_nan", decimal.New(math.NaN()), decimal.Decimal{}},
+		{"float64_pos_inf", decimal.New(math.Inf(1)), decimal.Decimal{}},
+		{"float64_neg_inf", decimal.New(math.Inf(-1)), decimal.Decimal{}},
+		{"float64_max", decimal.New(math.MaxFloat64), decimal.Decimal{Integer: 0x8000000000000000, Fraction: 0x8000000000000000, Digits: 18}},
+		{"float64_min", decimal.New(-math.MaxFloat64), decimal.Decimal{Negative: true, Integer: 0x8000000000000000, Fraction: 0x8000000000000000, Digits: 18}},
+		{"float64_max_uint64", decimal.New(float64(math.MaxUint64)), decimal.Decimal{Integer: 0x8000000000000000, Fraction: 0x8000000000000000, Digits: 18}},
+		{"float64_max_int64", decimal.New(float64(math.MaxInt64)), decimal.Decimal{Integer: 0x8000000000000000}},
+		{"float64_min_int64", decimal.New(float64(math.MinInt64)), decimal.Decimal{Negative: true, Integer: 0x8000000000000000}},
+		// signed integers
+		{"int", decimal.New(123), decimal.Decimal{Integer: 123}},
+		{"int_negative", decimal.New(-123), decimal.Decimal{Integer: 123, Negative: true}},
+		// min-value signed integers (must widen before negation)
+		{"int8_min", decimal.New(int8(math.MinInt8)), decimal.Decimal{Integer: uint64(math.MaxInt8) + 1, Negative: true}},
+		{"int16_min", decimal.New(int16(math.MinInt16)), decimal.Decimal{Integer: uint64(math.MaxInt16) + 1, Negative: true}},
+		{"int32_min", decimal.New(int32(math.MinInt32)), decimal.Decimal{Integer: uint64(math.MaxInt32) + 1, Negative: true}},
+		{"int64_min", decimal.New(int64(math.MinInt64)), decimal.Decimal{Integer: uint64(math.MaxInt64) + 1, Negative: true}},
+		// unsigned integers
+		{"uint", decimal.New(uint(42)), decimal.Decimal{Integer: 42}},
+		{"uint8", decimal.New(uint8(math.MaxUint8)), decimal.Decimal{Integer: math.MaxUint8}},
+		{"uint16", decimal.New(uint16(math.MaxUint16)), decimal.Decimal{Integer: math.MaxUint16}},
+		{"uint32", decimal.New(uint32(math.MaxUint32)), decimal.Decimal{Integer: math.MaxUint32}},
+		{"uint64", decimal.New(uint64(math.MaxUint64)), decimal.Decimal{Integer: math.MaxUint64}},
 		// Fixed
 		{"fixed", decimal.New(decimal.Fixed(12345)), decimal.Decimal{Integer: 123, Fraction: 45, Digits: 2}},
 		{"fixed_negative", decimal.New(decimal.Fixed(-12345)), decimal.Decimal{Integer: 123, Fraction: 45, Digits: 2, Negative: true}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if !decimal.Equal(tt.want, tt.got) {
+			if tt.got != tt.want {
 				t.Errorf("New() = %#v, want %#v", tt.got, tt.want)
 			}
 		})
